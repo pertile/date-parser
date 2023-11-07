@@ -1,0 +1,13 @@
+/.env
+/.ipynb_checkpoints
+/ai.py
+/bigram.py
+/dateSelector.js
+/input.txt
+/langchain.py
+/node_modules
+/package-lock.json
+/package.json
+/SuperHumanDateSelector.js
+/Untitled.ipynb
+/__pycache__
