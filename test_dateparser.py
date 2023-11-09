@@ -37,38 +37,102 @@ class TestDateParser(unittest.TestCase):
 
         base_date = datetime(2023, 11, 8, 11, 33, 0)
         expected_date = datetime(2023, 11, 9, 10, 0, 0, 0)
-        self.assertEqual(parse('mñn 10am', base_date=base_date, language="es"), expected_date)
+        self.assertEqual(parse('mñn 10a.m.', base_date=base_date, language="es"), expected_date)
+
+    def test_today_11pm(self):
+        base_date = datetime(2023, 11, 8, 11, 33, 0)
+        expected_date = datetime(2023, 11, 8, 23, 0, 0)
+        self.assertEqual(parse('today 11pm', base_date=base_date), expected_date)
+
+        base_date = datetime(2023, 11, 8, 11, 33, 0)
+        expected_date = datetime(2023, 11, 8, 23, 0, 0, 0)
+        self.assertEqual(parse('today 11 p.m.', base_date=base_date), expected_date)
+        
+        base_date = datetime(2023, 11, 8, 11, 33, 0)
+        expected_date = datetime(2023, 11, 8, 23, 0, 0, 0)
+        self.assertEqual(parse('hoy 11p.m.', base_date=base_date, language="es"), expected_date)
+    
+    def test_later(self):
+        base_date = datetime(2023, 11, 8, 12, 33, 0)
+        expected_date = datetime(2023, 11, 8, 16, 0, 0)
+        self.assertEqual(parse('later', base_date=base_date), expected_date)
+
+        # test a few hours
+        base_date = datetime(2023, 11, 8, 12, 33, 0)
+        expected_date = datetime(2023, 11, 8, 16, 0, 0)
+        self.assertEqual(parse('a few hours', base_date=base_date), expected_date)
+
+        # test a few hours
+        base_date = datetime(2023, 11, 8, 12, 33, 0)
+        expected_date = datetime(2023, 11, 8, 16, 0, 0)
+        self.assertEqual(parse('más tarde', base_date=base_date, language="es"), expected_date)
+
+    def test_tonight(self):
+        # test tonight
+        base_date = datetime(2023, 11, 8, 12, 33, 0)
+        expected_date = datetime(2023, 11, 8, 20, 0, 0)
+        self.assertEqual(parse('tonight', base_date=base_date), expected_date)
+
+        # test tonight and now is tonight
+        base_date = datetime(2023, 11, 20, 20, 33, 0)
+        expected_date = None
+        self.assertEqual(parse('tonight', base_date=base_date), expected_date)
+
+        # test esta noche
+        base_date = datetime(2023, 11, 8, 12, 33, 0)
+        expected_date = datetime(2023, 11, 8, 20, 0, 0)
+        self.assertEqual(parse('esta noche', base_date=base_date, language='es'), expected_date)
+
+    def test_weekend(self):
+        # test weekend
+        base_date = datetime(2023, 11, 8, 12, 33, 0)
+        expected_date = datetime(2023, 11, 11, 8, 0, 0)
+        self.assertEqual(parse('weekend', base_date=base_date), expected_date)
+
+        # test next weekend  (it's Saturday)
+        base_date = datetime(2023, 11, 11, 12, 33, 0)
+        expected_date = datetime(2023, 11, 18, 8, 0, 0)
+        self.assertEqual(parse('weeke', base_date=base_date), expected_date)
+
+        # test next weekend  (it's Sunday)
+        base_date = datetime(2023, 11, 12, 13, 33, 0)
+        expected_date = datetime(2023, 11, 18, 8, 0, 0)
+        self.assertEqual(parse('fin de sem', base_date=base_date, language="es"), expected_date)
+
+        base_date = datetime(2023, 11, 8, 12, 33, 0)
+        expected_date = datetime(2023, 11, 11, 15, 0, 0)
+        self.assertEqual(parse('weekend 3pm', base_date=base_date), expected_date)
 
 
+    def test_next_week(self):
+        # test next week
+        base_date = datetime(2023, 11, 8, 12, 33, 0)
+        expected_date = datetime(2023, 11, 13, 8, 0, 0)
+        self.assertEqual(parse('next week', base_date=base_date), expected_date)
 
-    # def test_today_10pm(self):
-    #     pass
+        # test next week
+        base_date = datetime(2023, 11, 8, 12, 33, 0)
+        expected_date = datetime(2023, 11, 13, 8, 0, 0)
+        self.assertEqual(parse('proxima semana', base_date=base_date, language="es"), expected_date)
 
-    # def test_later(self):
-    #     # test later
+    def test_next_month(self):
+        # test next month
+        base_date = datetime(2023, 11, 8, 12, 33, 0)
+        expected_date = datetime(2023, 12, 1, 8, 0, 0)
+        self.assertEqual(parse('next month', base_date=base_date), expected_date)
 
-    #     # test a few hours
-    #     pass
+        # test next month - spanish
+        base_date = datetime(2023, 11, 8, 12, 33, 0)
+        expected_date = datetime(2023, 12, 1, 8, 0, 0)
+        self.assertEqual(parse('siguiente mes', base_date=base_date, language="es"), expected_date)
 
-    # def test_tonight(self):
-    #     pass
+    def test_tuesday(self):
+        # just Tuesday
 
-    # def test_weekend(self):
-    #     # test weekend
+        # on Tuesday
 
-    #     # test this weekend
-    #     pass
-
-    # def test_next_week(self):
-    #     pass
-
-    # def test_tuesday(self):
-    #     # just Tuesday
-
-    #     # on Tuesday
-
-    #     # next Tuesday
-    #     pass
+        # next Tuesday
+        pass
 
     # def test_march(self):
     #     # just March

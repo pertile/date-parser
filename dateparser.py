@@ -69,6 +69,9 @@ GLOSSARY = {
         ('october', 'month', 10),
         ('november', 'month', 11),
         ('december', 'month', 12),
+        ('next week', 'weeks', 1),
+        ('next month', 'months', 1),
+        ('next year', 'years', 1),
     ],
     'es': [
         ('manana', 'days', 1),
@@ -101,6 +104,12 @@ GLOSSARY = {
         ('octubre', 'month', 10),
         ('noviembre', 'month', 11),
         ('diciembre', 'month', 12),
+        ('siguiente semana', 'weeks', 1),
+        ('siguiente mes', 'months', 1),
+        ('siguiente año', 'years', 1),
+        ('proxima semana', 'weeks', 1),
+        ('proximo mes', 'months', 1),
+        ('proximo ano', 'years', 1),
     ],
 }
 def next_weekday(date, weekday):
@@ -125,8 +134,16 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
         if especial == Especial.LATER:
             return (base_date + timedelta(hours=HOURS_LATER)).replace(minute=0, second=0, microsecond=0)
         elif especial == Especial.WEEKEND:
-            days = 5 - base_weekday if base_weekday < 5 else 7
-            return (base_date + timedelta(days=days)).replace(hour=8, minute=0, second=0, microsecond=0)
+            # if it is weekend (Saturday or Sunday), add two days to current day so it is on a laborable day
+            if base_date.day >= 5:
+                base_date = base_date + relativedelta(days=2)
+            # calculate next Saturday
+            result = next_weekday(base_date, 5)
+            year = result.year
+            month = result.month
+            day_number = result.day
+            if hour == None:
+                hour = 8
         elif especial == Especial.TONIGHT:
             if base_date.hour < 20:
                 return base_date.replace(hour=20, minute=0, second=0, microsecond=0)
@@ -348,13 +365,17 @@ def parse(text, language='en', base_date=None):
     
     especial = None
     year = None
+    years = 0
     month = None
+    months = 0
     day_number = None
-    days = None
+    days = 0
+    weeks = 0
     weekday = None
     hour = None
     minute = None
     second = None
+    # print(results)
     for r in results:
         if r[1] == 'especial':
             if especial is None:
@@ -362,7 +383,7 @@ def parse(text, language='en', base_date=None):
             else:
                 return None
         elif r[1] == 'days':
-            if days is None:
+            if days == 0:
                 days = r[2]
             else:
                 return None
@@ -370,6 +391,25 @@ def parse(text, language='en', base_date=None):
             weekday = r[2]
         elif r[1] == 'month':
             month = r[2]
+        elif r[1] == 'weeks':
+            weekday = 0
+            day_number = 1
+            hour = 8
+            minute = 0
+            second = 0
+        elif r[1] == 'months':
+            months = 1
+            day_number = 1
+            hour = 8
+            minute = 0
+            second = 0
+        elif r[1] == 'years':
+            years = 1
+            month = 1
+            day_number = 1
+            hour = 8
+            minute = 0
+            second = 0
     
     # check if am or pm is separated from the time. If it is, join them
     for i in range(1, len(words)):
@@ -379,7 +419,7 @@ def parse(text, language='en', base_date=None):
         
     # remove empty words (erased am/pm)
     words[:] =  (value for value in words if value != None)
-
+    # print(words)
     for word in words:
         
         #### FIND DAY WITH ORDINALS ######    
@@ -392,14 +432,17 @@ def parse(text, language='en', base_date=None):
         
         #### FIND HOUR ######
         if word[-2:] in ['am', 'pm'] or word[-4:] in ['a.m.', 'p.m.']:
+            pm = False
+            if 'p' in word:
+                pm = True
             word = word[:-2]
             if word[-1] == '.':
                 word = word[:-2]
             
             time = word.split(":")
             hour = int(time[0])
-            pm = 12 if (word[-2:] == 'pm' or word[-4:] == 'p.m.') and hour < 12 else 0
-            hour = hour + pm
+            
+            hour = hour + 12 if pm and hour < 12 else hour
             minute = 0
             second = 0
             if len(time) > 1:
@@ -438,14 +481,16 @@ def parse(text, language='en', base_date=None):
             # locale.setlocale(locale.LC_ALL, 'en-gb')
             # d.strftime('%x')
 
-    # print(year, month, day_number, days, weekday, hour, minute, second, especial)
+    # print("calling future", year, month, day_number, days, weekday, hour, minute, second, especial, weeks, years, months)
     return future_datetime(base_date=base_date, especial=especial, days=days, weekday=weekday, 
-        day_number=day_number, month=month, year=year, hour=hour, minute=minute, second=second)
+        day_number=day_number, month=month, year=year, hour=hour, minute=minute, second=second,
+        weeks=weeks, years=years, months=months)
     
 
 def words_to_datepart(text, language='en'):
     words = [x[0] for x in GLOSSARY[language]]
-    # print(words, text)
+    items = [GLOSSARY[language][words.index(x)] for x in words if x.startswith(text)]
+
     # first ask if input text is exactly like one of the words in the glossary (word is first element of tuple of glossaries)
     if text in words:
         return GLOSSARY[language][words.index(text)]
@@ -457,8 +502,9 @@ def words_to_datepart(text, language='en'):
         # slice items to remove the word and make a set of it, so if there are two or more words that start with input text
         # and the result of those words is the same (i.e. they mean the same concept), it returns the first one
         # EXAMPLE: tomor for tomorrow and tomorow
-        if len(set(items[1:])) == 1:
+        if len(set([x[1:] for x in items])) == 1:
             return items[0]
+    
     
     
 if __name__ == '__main__': 
