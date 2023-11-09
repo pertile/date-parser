@@ -128,11 +128,21 @@ class TestDateParser(unittest.TestCase):
 
     def test_tuesday(self):
         # just Tuesday
+        base_date = datetime(2023, 11, 8, 12, 33, 0)
+        expected_date = datetime(2023, 11, 14, 8, 0, 0)
+        self.assertEqual(parse('Tuesday', base_date=base_date), expected_date)
 
         # on Tuesday
+        base_date = datetime(2023, 11, 8, 12, 33, 0)
+        expected_date = datetime(2023, 11, 14, 8, 0, 0)
+        self.assertEqual(parse('on tuesday', base_date=base_date), expected_date)
 
-        # next Tuesday
-        pass
+        # next Tuesday - spanish
+        base_date = datetime(2023, 11, 8, 12, 33, 0)
+        expected_date = datetime(2023, 11, 14, 8, 0, 0)
+        self.assertEqual(parse('siguiente martes', base_date=base_date, language="es"), expected_date)
+
+        
 
     # def test_march(self):
     #     # just March

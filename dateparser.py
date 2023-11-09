@@ -393,7 +393,6 @@ def parse(text, language='en', base_date=None):
             month = r[2]
         elif r[1] == 'weeks':
             weekday = 0
-            day_number = 1
             hour = 8
             minute = 0
             second = 0
