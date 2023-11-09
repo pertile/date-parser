@@ -343,55 +343,58 @@ class TestFutureDate(unittest.TestCase):
 
     def test_in_200_seconds(self):
         base_date = datetime(2023,4,1,8,15)
-        self.assertEqual(future(base_date=base_date, second=200, relative=True), datetime(2023,4,1,8,18,20), "Should be 200 seconds later")
+        self.assertEqual(future(base_date=base_date, seconds=200), datetime(2023,4,1,8,18,20), "Should be 200 seconds later")
 
     def test_in_90_minutes(self):
         base_date = datetime(2023,4,1,8,15)
-        self.assertEqual(future(base_date=base_date, minute=90, relative=True), datetime(2023,4,1,9,45,0), "Should be 90 minutes later")
+        self.assertEqual(future(base_date=base_date, minutes=90), datetime(2023,4,1,9,45,0), "Should be 90 minutes later")
 
     def test_in_3_hours(self):
         base_date = datetime(2023,4,1,8,15)
-        self.assertEqual(future(base_date=base_date, hour=3, relative=True), datetime(2023,4,1,11,15,0), "Should be 3 hours later")
+        self.assertEqual(future(base_date=base_date, hours=3), datetime(2023,4,1,11,15,0), "Should be 3 hours later")
 
 
     def test_in_4_days(self):
         base_date = datetime(2023,4,1,16,25)
-        self.assertEqual(future(base_date=base_date, days=4, relative=True), datetime(2023,4,5,16,25,0), "Should be 3 hours later")
+        self.assertEqual(future(base_date=base_date, days=4), datetime(2023,4,5,16,25,0), "Should be 4 days later")
+
+        # in 4 days 9 am
+        self.assertEqual(future(base_date=base_date, days=4, hour=9, minute=0, second=0), datetime(2023,4,5,9,0,0), "Should be 4 days later 9 am")
 
 
     def test_in_5_weeks(self):
         base_date = datetime(2023,4,1,17,0)
-        self.assertEqual(future(base_date=base_date, weeks=5, relative=True), datetime(2023,5,6,17,0,0), "Should be 5 weeks  later")
+        self.assertEqual(future(base_date=base_date, weeks=5), datetime(2023,5,6,17,0,0), "Should be 5 weeks later")
 
 
     def test_in_6_months(self):
         base_date = datetime(2023,7,2,18,10)
-        self.assertEqual(future(base_date=base_date, month=6, relative=True), datetime(2024,1,2,18,10,0), "Should be 6 months later")
+        self.assertEqual(future(base_date=base_date, months=6), datetime(2024,1,2,18,10,0), "Should be 6 months later")
         
 
     def test_in_1_year(self):
         base_date = datetime(2023,8,3,19,5)
-        self.assertEqual(future(base_date=base_date, year=1, relative=True), datetime(2024,8,3,19,5,0), "Should be 1 year later")
+        self.assertEqual(future(base_date=base_date, years=1), datetime(2024,8,3,19,5,0), "Should be 1 year later")
 
 
     def test_in_1_month_and_3_days(self):
         base_date = datetime(2023,8,3,19,5)
-        self.assertEqual(future(base_date=base_date, month=1, days=3, relative=True), datetime(2023,9,6,19,5,0), "Should be 1 month and 3 days later")
+        self.assertEqual(future(base_date=base_date, months=1, days=3), datetime(2023,9,6,19,5,0), "Should be 1 month and 3 days later")
 
 
     def test_in_3_weeks_and_2_days(self):
         base_date = datetime(2023,8,3,19,5)
-        self.assertEqual(future(base_date=base_date, weeks=3, days=2, relative=True), datetime(2023,8,26,19,5,0), "Should be 23 days later")
+        self.assertEqual(future(base_date=base_date, weeks=3, days=2), datetime(2023,8,26,19,5,0), "Should be 23 days later")
 
 
     def test_in_5_hours_and_40_minutes(self):
         base_date = datetime(2023,8,3,19,5)
-        self.assertEqual(future(base_date=base_date, hour=5, minute=40, relative=True), datetime(2023,8,4,0,45,0), "Should be 5 hours and 40 minutes later")
+        self.assertEqual(future(base_date=base_date, hours=5, minutes=40), datetime(2023,8,4,0,45,0), "Should be 5 hours and 40 minutes later")
 
 
     def test_in_2_years_and_5_months(self):
         base_date = datetime(2023,8,3,19,5)
-        self.assertEqual(future(base_date=base_date, year=2, month=5, relative=True), datetime(2026,1,3,19,5,0), "Should be 28 months later")
+        self.assertEqual(future(base_date=base_date, years=2, months=5), datetime(2026,1,3,19,5,0), "Should be 28 months later")
         
  
 

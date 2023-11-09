@@ -1,19 +1,45 @@
 import unittest
-from dateparser import future_datetime as future, Especial
+from dateparser import parse
 from datetime import datetime
 
 class TestDateParser(unittest.TestCase):
 
-    # def test_tomorrow(self):
-    #     # test tomorrow
+    def test_tomorrow(self):
+        # test tomorrow
+        base_date = datetime(2023, 11, 8, 11, 33, 0)
+        expected_date = datetime(2023, 11, 9, 11, 33, 0, 0)
+        self.assertEqual(parse('tomorrow', base_date=base_date), expected_date)
 
-    #     # test tmrw
+        # test tmrw
+        base_date = datetime(2023, 11, 8, 11, 33, 0)
+        expected_date = datetime(2023, 11, 9, 11, 33, 0, 0)
+        self.assertEqual(parse('tmrw', base_date=base_date), expected_date)
 
-    #     # test tomorow
-    #     pass
+        # test tomor
+        base_date = datetime(2023, 11, 8, 11, 33, 0)
+        expected_date = datetime(2023, 11, 9, 11, 33, 0, 0)
+        self.assertEqual(parse('tomor', base_date=base_date), expected_date)
 
-    # def test_tomorrow_10am(self):
-    #     pass
+        # test mañana
+        base_date = datetime(2023, 11, 8, 11, 33, 0)
+        expected_date = datetime(2023, 11, 9, 11, 33, 0, 0)
+        self.assertEqual(parse('mañana', base_date=base_date, language="es"), expected_date)
+
+
+    def test_tomorrow_10am(self):
+        base_date = datetime(2023, 11, 8, 11, 33, 0)
+        expected_date = datetime(2023, 11, 9, 10, 0, 0)
+        self.assertEqual(parse('tomorrow 10am', base_date=base_date), expected_date)
+
+        base_date = datetime(2023, 11, 8, 11, 33, 0)
+        expected_date = datetime(2023, 11, 9, 10, 0, 0, 0)
+        self.assertEqual(parse('tomorrow 10 am', base_date=base_date), expected_date)
+
+        base_date = datetime(2023, 11, 8, 11, 33, 0)
+        expected_date = datetime(2023, 11, 9, 10, 0, 0, 0)
+        self.assertEqual(parse('mñn 10am', base_date=base_date, language="es"), expected_date)
+
+
 
     # def test_today_10pm(self):
     #     pass

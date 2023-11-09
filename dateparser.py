@@ -1,7 +1,6 @@
 '''
 It should be a function that receives: weekday, day number, month, year, hour, minute, second
 quarter, timezone, especial
-relative_date=False, relative_time=False
 all the other have None value as default
 
 it manages deterministic dates. They could be relative days (i.e. in two months and 5 days),
@@ -26,6 +25,7 @@ from dateutil.relativedelta import relativedelta
 import calendar
 
 import unicodedata
+import sys
 
 def normalize(input_str):
     nfkd_form = unicodedata.normalize('NFKD', input_str)
@@ -36,16 +36,20 @@ class Especial(Enum):
     WEEKEND = 'weekend'
     TONIGHT = 'tonight'
 
-KEYWORDS = {
+GLOSSARY = {
     'en': [
-        ('tomorrow', 'relative-days', 1),
-        ('tmrw', 'relative-days', 1),
-        ('tomorow', 'relative-days', 1),
+        ('tomorrow', 'days', 1),
+        ('tmrw', 'days', 1),
+        ('tomorow', 'days', 1),
         ('later', 'especial', Especial.LATER),
         ('few', 'especial', Especial.LATER),
         ('a few hours', 'especial', Especial.LATER),
         ('tonight', 'especial', Especial.TONIGHT),
         ('weekend', 'especial', Especial.WEEKEND),
+        ('morning', 'hour', 8),
+        ('afternoon', 'hour', 13),
+        ('evening', 'hour', 20),
+        ('night', 'hour', 20),
         ('monday', 'weekday', 0),
         ('tuesday', 'weekday', 1),
         ('wednesday', 'weekday', 2),
@@ -67,14 +71,17 @@ KEYWORDS = {
         ('december', 'month', 12),
     ],
     'es': [
-        ('mañana', 'relative-days', 1),
-        ('mñn', 'relative-days', 1),
-        ('manana', 'relative-days', 1),
+        ('manana', 'days', 1),
+        ('mnn', 'days', 1),
         ('despues', 'especial', Especial.LATER),
         ('mas tarde', 'especial', Especial.LATER),
         ('esta noche', 'especial', Especial.TONIGHT),
         ('finde', 'especial', Especial.WEEKEND),
         ('fin de semana', 'especial', Especial.WEEKEND),
+        ('temprano', 'hour', 8),
+        ('a la tarde', 'hour', 16),
+        ('noche', 'hour', 20),
+        ('siesta', 'hour', 13),
         ('lunes', 'weekday', 0),
         ('martes', 'weekday', 1),
         ('miercoles', 'weekday', 2),
@@ -102,8 +109,9 @@ def next_weekday(date, weekday):
         days_ahead += 7
     return date + timedelta(days=days_ahead)
 
-def future_datetime(weekday=None, weeks=None, day_number=None, days=None, month=None, year=None, hour=None, minute=None, 
-    fortnights=None, second=None, quarter=None, timezone=None, especial=None, relative=False, base_date=None):
+def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, months=0, 
+    year=None, years=0, hour=None, hours=0, minute=None, minutes=0, second=None, seconds=0, 
+    quarter=None, timezone=None, especial=None, base_date=None):
 
 
     HOURS_LATER = 4
@@ -112,30 +120,6 @@ def future_datetime(weekday=None, weeks=None, day_number=None, days=None, month=
     base_weekday = base_date.weekday()
     base_month = base_date.month
     base_year = base_date.year
-
-    if relative:
-        if days is None:
-            days = 0
-        if weeks is None:
-            weeks = 0
-        months = month
-        if months is None:
-            months = 0
-        years = year
-        if years is None:
-            years = 0
-        hours = hour
-        if hours is None:
-            hours = 0
-        minutes = minute
-        if minutes is None:
-            minutes = 0
-        seconds = second
-        if seconds is None:
-            seconds = 0
-        return base_date + relativedelta(days=days, weeks=weeks, months=months, years=years, hours=hours, minutes=minutes, seconds=seconds)
-
-
 
     if especial is not None:
         if especial == Especial.LATER:
@@ -149,180 +133,197 @@ def future_datetime(weekday=None, weeks=None, day_number=None, days=None, month=
             else:
                 return None
 
-    hour_was_none = hour is None
-    if hour is None:
-        hour = 8
-    if minute is None:
-        minute = 0
-    if second is None:
-        second = 0
 
-    if weekday is not None:
-       # only weekday, just look for next weekday
-        if day_number is None and month is None and year is None:
-            return next_weekday(base_date + relativedelta(days=1), weekday).replace(hour=hour, minute=minute, second=second, microsecond=0)
-        
-        # day number, month and year. Check if it is the same weekday and if it is in the future
-        elif day_number is not None and month is not None and year is not None:
-            result = datetime(year, month, day_number, hour, minute, second, microsecond=0)
-            if result.weekday() == weekday and result > base_date:
-                return result
-            else:
-                return None
+    if years == 0 and months == 0 and days == 0 and hours == 0 and minutes == 0 and seconds == 0 and weeks == 0:
+        hour_was_none = hour is None
+        if hour is None:
+            hour = 8
+        if minute is None:
+            minute = 0
+        if second is None:
+            second = 0
+
+        if weekday is not None:
+        # only weekday, just look for next weekday
+            if day_number is None and month is None and year is None:
+                return next_weekday(base_date + relativedelta(days=1), weekday).replace(hour=hour, minute=minute, second=second, microsecond=0)
             
-        # day number
-        elif day_number is not None:
-            # initial month is base month or the month you input
-            start_month = base_month
-            if month is not None:
-                start_month = month
-            # initial year is base year or the year you input
-            start_year = base_year
-            if year is not None:
-                start_year = year
-            try_date = datetime(start_year, start_month, day_number, hour=hour, minute=minute, second=second)
+            # day number, month and year. Check if it is the same weekday and if it is in the future
+            elif day_number is not None and month is not None and year is not None:
+                result = datetime(year, month, day_number, hour, minute, second, microsecond=0)
+                if result.weekday() == weekday and result > base_date:
+                    return result
+                else:
+                    return None
+                
+            # day number
+            elif day_number is not None:
+                # initial month is base month or the month you input
+                start_month = base_month
+                if month is not None:
+                    start_month = month
+                # initial year is base year or the year you input
+                start_year = base_year
+                if year is not None:
+                    start_year = year
+                try_date = datetime(start_year, start_month, day_number, hour=hour, minute=minute, second=second)
 
-            # if the date is before the base date, it has to be the next month
-            if try_date < base_date:
+                # if the date is before the base date, it has to be the next month
+                if try_date < base_date:
+                    if month is None:
+                        try_date = try_date + relativedelta(months=1)
+                    else:
+                        try_date = try_date + relativedelta(years=1)
+                
+                stop_year = 99999
+                if year is not None:
+                    stop_year = year
+                plus_months = 0
+                plus_years = 0
+
+                # if month is empty try month by month
                 if month is None:
-                    try_date = try_date + relativedelta(months=1)
+                    plus_months = 1
                 else:
-                    try_date = try_date + relativedelta(years=1)
-            
-            stop_year = 99999
-            if year is not None:
-                stop_year = year
-            plus_months = 0
-            plus_years = 0
+                    # if month is not empty try year by year
+                    plus_years = 1
 
-            # if month is empty try month by month
-            if month is None:
-                plus_months = 1
-            else:
-                # if month is not empty try year by year
-                plus_years = 1
-
-            # try advancing month or year until you find the weekday or year is ahead of input year            
-            while try_date.weekday() != weekday and stop_year >= try_date.year:
-                try_date = try_date + relativedelta(months=plus_months, years=plus_years)
+                # try advancing month or year until you find the weekday or year is ahead of input year            
+                while try_date.weekday() != weekday and stop_year >= try_date.year:
+                    try_date = try_date + relativedelta(months=plus_months, years=plus_years)
+                
+                if try_date.weekday() == weekday:
+                    return try_date
+                else:
+                    return None
             
-            if try_date.weekday() == weekday:
-                return try_date
+            # month but not day_number (and may be year)
+            elif month is not None:
+
+                start_date = base_date
+                # if year is empty, could be this year or next year
+                if year is  None:
+                    # if month is not current month, it starts on 1st day of that month
+                    if month != base_month:
+                        start_date = datetime(base_year, month, 1, hour, minute, second)
+                        # if year is empty and month is before current month, it has to be same month next year
+                        if start_date < base_date:
+                            start_date = start_date + relativedelta(years=1)
+                else:
+                    # if year is present, it starts on 1st day of that month-year
+                    start_date = datetime(year, month, 1, hour, minute, second)
+                    
+                    # if it is current month-year it starts on current day
+                    if start_date.year == base_date.year:
+                        if start_date.month == base_date.month:
+                            start_date = base_date
+                    # if it is previous year returns None
+                    elif start_date.year < base_date.year:
+                        return None
+                    
+                result = next_weekday(start_date, weekday)
+
+                if result.month == month:
+                    return result
+                else:
+                    # it is a weekday after the last weekday in that month, so it looks for the first weekday same month next year
+                    if year is None:
+                        return next_weekday(start_date.replace(day=1) + relativedelta(years=1), weekday)
+                    # if it is a weekday after the last weekday in that month, and year is present, it returns None
+                    else:
+                        return None
+
+            # only year
+            elif year is not None:
+                start_date = base_date
+                if year > base_year:
+                    start_date = datetime(year, 1, 1, hour, minute, second)
+                elif year < base_year:
+                    return None
+                elif weekday == start_date.weekday() and hour < start_date.hour:
+                    start_date = start_date + relativedelta(days=1)
+                
+                result = next_weekday(start_date, weekday)
+                if result.year == year:
+                    return result
+                else:
+                    # it is a weekday after last weekday on the year
+                    return None
+
+        day_was_none = day_number is None
+        if day_number is None:
+            if hour_was_none or quarter is not None:
+                day_number = 1
             else:
-                return None
+                day_number = base_date.day
+                if hour <= base_date.hour and month is None and year is None and quarter is None:
+                    day_number = day_number + 1
         
-        # month but not day_number (and may be year)
-        elif month is not None:
-
-            start_date = base_date
-            # if year is empty, could be this year or next year
-            if year is  None:
-                # if month is not current month, it starts on 1st day of that month
-                if month != base_month:
-                    start_date = datetime(base_year, month, 1, hour, minute, second)
-                    # if year is empty and month is before current month, it has to be same month next year
-                    if start_date < base_date:
-                        start_date = start_date + relativedelta(years=1)
-            else:
-                # if year is present, it starts on 1st day of that month-year
-                start_date = datetime(year, month, 1, hour, minute, second)
-                
-                # if it is current month-year it starts on current day
-                if start_date.year == base_date.year:
-                    if start_date.month == base_date.month:
-                        start_date = base_date
-                # if it is previous year returns None
-                elif start_date.year < base_date.year:
-                    return None
-                
-            result = next_weekday(start_date, weekday)
-
-            if result.month == month:
-                return result
-            else:
-                # it is a weekday after the last weekday in that month, so it looks for the first weekday same month next year
-                if year is None:
-                    return next_weekday(start_date.replace(day=1) + relativedelta(years=1), weekday)
-                # if it is a weekday after the last weekday in that month, and year is present, it returns None
+        month_was_none = month is None
+        if month is None:
+            if quarter is None:
+                if day_was_none and hour_was_none:
+                    month = 1
                 else:
-                    return None
-
-        # only year
-        elif year is not None:
-            start_date = base_date
-            if year > base_year:
-                start_date = datetime(year, 1, 1, hour, minute, second)
-            elif year < base_year:
-                return None
-            elif weekday == start_date.weekday() and hour < start_date.hour:
-                start_date = start_date + relativedelta(days=1)
-            
-            result = next_weekday(start_date, weekday)
-            if result.year == year:
-                return result
+                    month = base_month
+                    if day_number < base_date.day or (day_number==base_date.day and hour <= base_date.hour):
+                        month = month + 1
             else:
-                # it is a weekday after last weekday on the year
-                return None
+                month = (quarter - 1) * 3 + 1
+            
 
+        if year is None:
+            year = base_year
+            if month < base_month or (month == base_month and day_number < base_date.day) or (month == base_month and day_number == base_date.day and hour <= base_date.hour):
+                year = year + 1
 
-    day_was_none = day_number is None
-    if day_number is None:
-        if hour_was_none or quarter is not None:
+        if day_number == 29 and month == 2 and not calendar.isleap(year):
             day_number = 1
-        else:
-            day_number = base_date.day
-            if hour <= base_date.hour and month is None and year is None and quarter is None:
-                day_number = day_number + 1
-    
-    month_was_none = month is None
-    if month is None:
-        if quarter is None:
-            if day_was_none and hour_was_none:
-                month = 1
-            else:
-                month = base_month
-                if day_number < base_date.day or (day_number==base_date.day and hour <= base_date.hour):
-                    month = month + 1
-        else:
-            month = (quarter - 1) * 3 + 1
-        
+            month = 3
+
+        # print(year, month, day_number)
+        last_month_day = calendar.monthrange(year, month)[1]
+        # this could be because you asked for 31st on a 30 days month (only day_number is present)
+        # or if only hour is present but not day_number because you are in an hour after your base_hour so it adds a day
+        # to the last day of a month (31, 30, 29 or 28, it depends on the month and the year)
+        # solution is always getting the next month because there aren't two consecutives months with less than 31 days
+
+        if day_number > last_month_day:
+            month = month % 12 + 1
+            # if day was present, you have to keep that day_number (and so you add a month)
+            # if day was empty, your day_number move to the first day in next month
+            if month == 1:
+                year = year + 1
+            if day_was_none:
+                day_number = 1
 
     if year is None:
         year = base_year
-        if month < base_month or (month == base_month and day_number < base_date.day) or (month == base_month and day_number == base_date.day and hour <= base_date.hour):
-            year = year + 1
+    if month is None:
+        month = base_month
+    if day_number is None:
+        day_number = base_date.day
+    if hour is None:
+        hour = base_date.hour
+    if minute is None:
+        minute = base_date.minute
+    if second is None:
+        second = base_date.second
 
-    if day_number == 29 and month == 2 and not calendar.isleap(year):
-        day_number = 1
-        month = 3
+    # print(year, month, day_number, hour, minute, second, years, months, days, weeks, hours, minutes, seconds)
+    result = datetime(year, month, day_number, hour, minute, second, microsecond=0) + relativedelta(years=years, 
+        months=months, days=days, weeks=weeks, hours=hours, minutes=minutes, seconds=seconds)
 
-    # print(year, month, day_number)
-    last_month_day = calendar.monthrange(year, month)[1]
-    # this could be because you asked for 31st on a 30 days month (only day_number is present)
-    # or if only hour is present but not day_number because you are in an hour after your base_hour so it adds a day
-    # to the last day of a month (31, 30, 29 or 28, it depends on the month and the year)
-    # solution is always getting the next month because there aren't two consecutives months with less than 31 days
-
-    if day_number > last_month_day:
-        month = month % 12 + 1
-        # if day was present, you have to keep that day_number (and so you add a month)
-        # if day was empty, your day_number move to the first day in next month
-        if month == 1:
-            year = year + 1
-        if day_was_none:
-            day_number = 1
-
-
-    result = datetime(year, month, day_number, hour, minute, second, microsecond=0)
-    # print(result, "result")
-    # print(base_date, "base_date")
     if  result > base_date:
         return result
     else:
         return None
     
 
-def parse(text, language='en'):
+def parse(text, language='en', base_date=None):
+    if base_date is None:
+        base_date = datetime.now()
+
     text = normalize(text)
     words = text.split(" ")
     results = []
@@ -330,9 +331,10 @@ def parse(text, language='en'):
     #### FIND WORDS ######
     # start looking for 3 words phrases, then 2 words phrases and finally 1 word
     for size in range(3, 0, -1):
-        # stop looking at len(words) - size, so if there are 10 words you can only look up to 8th word for a 3 word prhase
+        # stop looking at len(words) - size, so if there are 10 words you can only look up to 8th word for a 3 words prhase
         for i in range(len(words) - size + 1):
-            # print(f"Position {i} of {len(words)-size}. Palabra:")
+            # print(f"Position {i} of {len(words)-size}. Word:")
+            
             # conditional to avoid looking for erased words
             if words[i] is not None:
                 # print(words[i:i+size])
@@ -345,20 +347,21 @@ def parse(text, language='en'):
         words[:] =  (value for value in words if value != None)
     
     especial = None
-    relative = False
+    year = None
+    month = None
     day_number = None
     days = None
     weekday = None
-    month = None
-
+    hour = None
+    minute = None
+    second = None
     for r in results:
         if r[1] == 'especial':
             if especial is None:
                 especial = r[2]
             else:
                 return None
-        elif r[1] == 'relative-days':
-            relative = True
+        elif r[1] == 'days':
             if days is None:
                 days = r[2]
             else:
@@ -368,7 +371,15 @@ def parse(text, language='en'):
         elif r[1] == 'month':
             month = r[2]
     
-    
+    # check if am or pm is separated from the time. If it is, join them
+    for i in range(1, len(words)):
+        if words[i] in ['am', 'pm', 'a.m.', 'p.m.']:
+            words[i-1] = words[i-1] + words[i]
+            words[i] = None
+        
+    # remove empty words (erased am/pm)
+    words[:] =  (value for value in words if value != None)
+
     for word in words:
         
         #### FIND DAY WITH ORDINALS ######    
@@ -378,21 +389,80 @@ def parse(text, language='en'):
                 day_number = int(number)
             except ValueError:
                 return None
-    
+        
+        #### FIND HOUR ######
+        if word[-2:] in ['am', 'pm'] or word[-4:] in ['a.m.', 'p.m.']:
+            word = word[:-2]
+            if word[-1] == '.':
+                word = word[:-2]
+            
+            time = word.split(":")
+            hour = int(time[0])
+            pm = 12 if (word[-2:] == 'pm' or word[-4:] == 'p.m.') and hour < 12 else 0
+            hour = hour + pm
+            minute = 0
+            second = 0
+            if len(time) > 1:
+                minute = int(time[1])
+            if len(time) > 2:
+                second = int(time[2])
+        
         #### FIND YEAR ######
-        if len(word) == 4 and word.startswith("20") and word.isdigit() and word[-2] >= datetime.now().year and word[-2] <= datetime.now().year + 10:
+        if len(word) == 4 and word.startswith("20") and word.isdigit() and int(word) >= datetime.now().year and int(word) <= datetime.now().year + 10:
             year = int(word)
             if year > 2030 or year < 2020:
                 return None
+        
+        #### FIND DATE SEPARATED BY DASH OR SLASH ######
+        separator = None
+        if '-' in word:
+            separator = '-'
+        elif '/' in word:
+            separator = '/'
+        elif '\\' in word:
+            separator = '\\'
+        elif '–' in word:
+            separator = '–'
+        
+        if separator is not None:
+            date_array = word.split(separator)
+            # year is at the beginning, is yyyy-mm or yyyy-mm-dd
+            if len(date_array[0]) == 4:
+                year = int(date_array[0])
+                month = int(date_array[1])
+                if len(date_array) == 3:
+                    day_number = int(date_array[2])
+                else:
+                    day_number = 1
+            
+            # locale.setlocale(locale.LC_ALL, 'en-gb')
+            # d.strftime('%x')
 
-    print(future_datetime(especial=especial, relative=relative, days=days, weekday=weekday, day_number=day_number, month=month))
+    # print(year, month, day_number, days, weekday, hour, minute, second, especial)
+    return future_datetime(base_date=base_date, especial=especial, days=days, weekday=weekday, 
+        day_number=day_number, month=month, year=year, hour=hour, minute=minute, second=second)
+    
 
 def words_to_datepart(text, language='en'):
-    words = [x[0] for x in KEYWORDS[language]]
+    words = [x[0] for x in GLOSSARY[language]]
+    # print(words, text)
+    # first ask if input text is exactly like one of the words in the glossary (word is first element of tuple of glossaries)
     if text in words:
-        return KEYWORDS[language][words.index(text)]
-    elif len([x for x in words if x.startswith(text)]) == 1:
-        item = [x for x in words if x.startswith(text)][0]
-        return KEYWORDS[language][words.index(item)]
+        return GLOSSARY[language][words.index(text)]
+    # then ask if there is at least one word that starts with input text
+    elif len([x for x in words if x.startswith(text)]) >= 1:
+        # get all of the words that start with input text
+        items = [GLOSSARY[language][words.index(x)] for x in words if x.startswith(text)]
+
+        # slice items to remove the word and make a set of it, so if there are two or more words that start with input text
+        # and the result of those words is the same (i.e. they mean the same concept), it returns the first one
+        # EXAMPLE: tomor for tomorrow and tomorow
+        if len(set(items[1:])) == 1:
+            return items[0]
     
     
+if __name__ == '__main__': 
+    
+    language = 'en'
+
+    print(parse(sys.argv[1]))
