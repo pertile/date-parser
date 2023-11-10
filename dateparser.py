@@ -17,12 +17,13 @@ If you write "01-06" it suggests June 1st or January 6th depending on your langu
 
 MAKE LOT OF TESTS
 '''
-
+# TODO: replace 8 with constant
+# TODO: replace 2nd element in glossary tuple with constants
 
 from enum import Enum
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-import calendar
+import pytz
 
 import unicodedata
 import sys
@@ -35,21 +36,32 @@ class Especial(Enum):
     LATER = 'later'
     WEEKEND = 'weekend'
     TONIGHT = 'tonight'
+    TOMORROW = 'tomorrow'
+    NEXT_WEEK = 'next_week'
+    NEXT_MONTH = 'next_month'
+    NEXT_QUARTER = 'next_quarter'
+    NEXT_YEAR = 'next_year'
 
 GLOSSARY = {
     'en': [
-        ('tomorrow', 'days', 1),
-        ('tmrw', 'days', 1),
-        ('tomorow', 'days', 1),
+        ('tomorrow', 'especial', Especial.TOMORROW),
+        ('tmrw', 'especial', Especial.TOMORROW),
+        ('tomorow', 'especial', Especial.TOMORROW),
         ('later', 'especial', Especial.LATER),
         ('few', 'especial', Especial.LATER),
         ('a few hours', 'especial', Especial.LATER),
         ('tonight', 'especial', Especial.TONIGHT),
         ('weekend', 'especial', Especial.WEEKEND),
+        ('next week', 'especial', Especial.NEXT_WEEK),
+        ('next month', 'especial', Especial.NEXT_MONTH),
+        ('next quarter', 'especial', Especial.NEXT_QUARTER),
+        ('next year', 'especial', Especial.NEXT_YEAR),
         ('morning', 'hour', 8),
+        ('noon', 'hour', 12),
         ('afternoon', 'hour', 13),
         ('evening', 'hour', 20),
         ('night', 'hour', 20),
+        ('midnight', 'hour', 0),
         ('monday', 'weekday', 0),
         ('tuesday', 'weekday', 1),
         ('wednesday', 'weekday', 2),
@@ -69,21 +81,43 @@ GLOSSARY = {
         ('october', 'month', 10),
         ('november', 'month', 11),
         ('december', 'month', 12),
-        ('next week', 'weeks', 1),
         ('next month', 'months', 1),
         ('next year', 'years', 1),
+        ('qone', 'quarter', 1),
+        ('qtwo', 'quarter', 2),
+        ('qthree', 'quarter', 3),
+        ('qfour', 'quarter', 4),
+        # ('CT', 'timezone', 'America/Chicago'),
+        # ('CST', 'timezone', 'America/Chicago'),
+        # ('Central', 'timezone', 'America/Chicago'),
     ],
     'es': [
-        ('manana', 'days', 1),
-        ('mnn', 'days', 1),
+        ('manana', 'especial', Especial.TOMORROW),
+        ('mnn', 'especial', Especial.TOMORROW),
         ('despues', 'especial', Especial.LATER),
         ('mas tarde', 'especial', Especial.LATER),
         ('esta noche', 'especial', Especial.TONIGHT),
         ('finde', 'especial', Especial.WEEKEND),
         ('fin de semana', 'especial', Especial.WEEKEND),
+        ('siguiente semana', 'especial', Especial.NEXT_WEEK),
+        ('proxima semana', 'especial', Especial.NEXT_WEEK),
+        ('semana que viene', 'especial', Especial.NEXT_WEEK),
+        ('siguiente mes', 'especial', Especial.NEXT_MONTH),
+        ('proximo mes', 'especial', Especial.NEXT_MONTH),
+        ('mes que viene', 'especial', Especial.NEXT_MONTH),
+        ('siguiente cuatrimestre', 'especial', Especial.NEXT_QUARTER),
+        ('proximo cuatrimestre', 'especial', Especial.NEXT_QUARTER),
+        ('siguiente ano', 'especial', Especial.NEXT_YEAR),
+        ('proximo ano', 'especial', Especial.NEXT_YEAR),
+        ('ano que viene', 'especial', Especial.NEXT_YEAR),
         ('temprano', 'hour', 8),
+        ('a la manana', 'hour', 8),
+        ('por la manana', 'hour', 8),
         ('a la tarde', 'hour', 16),
+        ('por la tarde', 'hour', 16),
+        ('mediodia', 'hour', 12),
         ('noche', 'hour', 20),
+        ('medianoche', 'hour', 0),
         ('siesta', 'hour', 13),
         ('lunes', 'weekday', 0),
         ('martes', 'weekday', 1),
@@ -104,12 +138,14 @@ GLOSSARY = {
         ('octubre', 'month', 10),
         ('noviembre', 'month', 11),
         ('diciembre', 'month', 12),
-        ('siguiente semana', 'weeks', 1),
         ('siguiente mes', 'months', 1),
         ('siguiente año', 'years', 1),
-        ('proxima semana', 'weeks', 1),
         ('proximo mes', 'months', 1),
         ('proximo ano', 'years', 1),
+        # ('CT', 'timezone', 'America/Chicago'),
+        # ('CST', 'timezone', 'America/Chicago'),
+        # ('Central', 'timezone', 'America/Chicago'),
+
     ],
 }
 def next_weekday(date, weekday):
@@ -118,10 +154,27 @@ def next_weekday(date, weekday):
         days_ahead += 7
     return date + timedelta(days=days_ahead)
 
+
 def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, months=0, 
     year=None, years=0, hour=None, hours=0, minute=None, minutes=0, second=None, seconds=0, 
     quarter=None, timezone=None, especial=None, base_date=None):
 
+    # if it is an especial day it doesn't consider any other information about date
+    
+    # if it has relative days, it doesn't consider any other information about date
+
+    # if it is not especial nor relative, calculation will be different depending on
+    # whether there is a weekday or not.
+    # The logic for the absent date parts depends on whether there is a greater date part
+    # if there is a greater date part it is the first value
+    # i.e. you have year but not day_number nor month, day_number and month are 1st of January
+    # i.e. you have month but not day_number, day_number is 1st of that month
+    # if there is not a greater date part is current value (base_date value)
+    # or the next one if current value of the lesser date parts is before
+    # i.e. if it is 10th of January and you ask for 15th (without month or year), it is 15th of January
+    # but if it is 20th of January and you ask for 15th it is 15th of February
+    # idem for months and years, if it is July and you ask for October without year will be same year
+    # but if you as for March will be March next year
 
     HOURS_LATER = 4
     if base_date is None:
@@ -129,6 +182,13 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
     base_weekday = base_date.weekday()
     base_month = base_date.month
     base_year = base_date.year
+
+    if hour is None:
+        hour = 8
+    if minute is None:
+        minute = 0
+    if second is None:
+        second = 0
 
     if especial is not None:
         if especial == Especial.LATER:
@@ -139,26 +199,34 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
                 base_date = base_date + relativedelta(days=2)
             # calculate next Saturday
             result = next_weekday(base_date, 5)
-            year = result.year
-            month = result.month
-            day_number = result.day
-            if hour == None:
-                hour = 8
+            return result.replace(hour=hour, minute=minute, second=second, microsecond=0)
         elif especial == Especial.TONIGHT:
             if base_date.hour < 20:
                 return base_date.replace(hour=20, minute=0, second=0, microsecond=0)
             else:
                 return None
+        elif especial == Especial.TOMORROW:
+            return (base_date + timedelta(days=1)).replace(hour=hour, minute=minute, second=second, microsecond=0)
+        elif especial == Especial.NEXT_WEEK:
+            # next Monday, if today is Monday next week Monday (today + 7 days)
+            result = next_weekday(base_date, 0) if base_weekday > 0 else base_date + relativedelta(days=7)
+            return result.replace(hour=hour, minute=minute, second=second, microsecond=0)
+        elif especial == Especial.NEXT_MONTH:
+            # this quarter start date + 3 months
+            result = base_date.replace(day=1) + relativedelta(months=1)
+            return result.replace(hour=hour, minute=minute, second=second, microsecond=0)
+        elif especial == Especial.NEXT_QUARTER:
+            # this quarter start date + 3 months
+            result = base_date.replace(month=base_month // 3 * 3  + 1, day=1) + relativedelta(months=3)
+            return result.replace(hour=hour, minute=minute, second=second, microsecond=0)
+        elif especial == Especial.NEXT_YEAR:
+            result = base_date.replace(month=1, day=1) + relativedelta(years=1)
+            return result.replace(hour=hour, minute=minute, second=second, microsecond=0)
 
 
     if years == 0 and months == 0 and days == 0 and hours == 0 and minutes == 0 and seconds == 0 and weeks == 0:
         hour_was_none = hour is None
-        if hour is None:
-            hour = 8
-        if minute is None:
-            minute = 0
-        if second is None:
-            second = 0
+
 
         if weekday is not None:
         # only weekday, just look for next weekday
@@ -267,59 +335,74 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
                     # it is a weekday after last weekday on the year
                     return None
 
-        day_was_none = day_number is None
+        # if I don't have a day_number and I have a greater unit (month, year, quarter) I have to start on 1st day of that unit
+        # if I don't have a greater unit, I have to start on current day, or may be tomorrow if hour is before base_hour
+        
+        plus_day = 0
+        plus_month = 0
+        plus_year = 0
         if day_number is None:
-            if hour_was_none or quarter is not None:
+            if month is not None or quarter is not None or year is not None:
                 day_number = 1
             else:
                 day_number = base_date.day
-                if hour <= base_date.hour and month is None and year is None and quarter is None:
-                    day_number = day_number + 1
+                # if I add 1 day to day_number, it could be after last_day of month
+                # as last_day of month depends on the year (because of leap years)
+                # I make that check after setting month and year
+                if hour is not None and hour <= base_date.hour:
+                    plus_day = 1
         
+        # if I don't have a month and I have a year I have to start on first month of that year
+        # if I don't have a month and I have a quarter, I have to calculate which is the first month of that quarter
+        # if I don't have a month nor any greater unit it should be current month, except day_number
+        # is before base_day_number, in which case it should be next month
         month_was_none = month is None
         if month is None:
-            if quarter is None:
-                if day_was_none and hour_was_none:
-                    month = 1
-                else:
-                    month = base_month
-                    if day_number < base_date.day or (day_number==base_date.day and hour <= base_date.hour):
-                        month = month + 1
-            else:
+            if quarter is not None:
                 month = (quarter - 1) * 3 + 1
+            elif year is not None:
+                month = 1
+            else:
+                month = base_month
+                if day_number < base_date.day:
+                    plus_month = 1
             
-
+        # if I don't have a year it should be current year, EXCEPT:
+        # if month is before base_month or month equals base_month and day_number is before base_day_number
+        # in that case it should be next year
         if year is None:
             year = base_year
-            if month < base_month or (month == base_month and day_number < base_date.day) or (month == base_month and day_number == base_date.day and hour <= base_date.hour):
-                year = year + 1
+            if month < base_month or (month == base_month and day_number < base_date.day):
+                plus_year = 1
+        
+        temp_date = datetime(year, month, day_number) + relativedelta(days=plus_day, months=plus_month, years=plus_year)
+        day_number = temp_date.day
+        month = temp_date.month
+        year = temp_date.year
 
-        if day_number == 29 and month == 2 and not calendar.isleap(year):
-            day_number = 1
-            month = 3
 
-        # print(year, month, day_number)
-        last_month_day = calendar.monthrange(year, month)[1]
-        # this could be because you asked for 31st on a 30 days month (only day_number is present)
-        # or if only hour is present but not day_number because you are in an hour after your base_hour so it adds a day
-        # to the last day of a month (31, 30, 29 or 28, it depends on the month and the year)
-        # solution is always getting the next month because there aren't two consecutives months with less than 31 days
+    #     # print(year, month, day_number)
+    #     last_month_day = calendar.monthrange(year, month)[1]
+    #     # this could be because you asked for 31st on a 30 days month (only day_number is present)
+    #     # or if only hour is present but not day_number because you are in an hour after your base_hour so it adds a day
+    #     # to the last day of a month (31, 30, 29 or 28, it depends on the month and the year)
+    #     # solution is always getting the next month because there aren't two consecutives months with less than 31 days
 
-        if day_number > last_month_day:
-            month = month % 12 + 1
-            # if day was present, you have to keep that day_number (and so you add a month)
-            # if day was empty, your day_number move to the first day in next month
-            if month == 1:
-                year = year + 1
-            if day_was_none:
-                day_number = 1
+    #     if day_number > last_month_day:
+    #         month = month % 12 + 1
+    #         # if day was present, you have to keep that day_number (and so you add a month)
+    #         # if day was empty, your day_number move to the first day in next month
+    #         if month == 1:
+    #             year = year + 1
+    #         if day_was_none:
+    #             day_number = 1
 
-    if year is None:
-        year = base_year
-    if month is None:
-        month = base_month
-    if day_number is None:
-        day_number = base_date.day
+    # if year is None:
+    #     year = base_year
+    # if month is None:
+    #     month = base_month
+    # if day_number is None:
+    #     day_number = base_date.day
     if hour is None:
         hour = base_date.hour
     if minute is None:
@@ -375,6 +458,7 @@ def parse(text, language='en', base_date=None):
     hour = None
     minute = None
     second = None
+    quarter = None
     # print(results)
     for r in results:
         if r[1] == 'especial':
@@ -391,24 +475,32 @@ def parse(text, language='en', base_date=None):
             weekday = r[2]
         elif r[1] == 'month':
             month = r[2]
+        elif r[1] == 'quarter':
+            quarter = r[2]
         elif r[1] == 'weeks':
+            weeks = r[2]
             weekday = 0
             hour = 8
             minute = 0
             second = 0
         elif r[1] == 'months':
-            months = 1
+            months = r[2]
             day_number = 1
             hour = 8
             minute = 0
             second = 0
         elif r[1] == 'years':
-            years = 1
+            years = r[2]
             month = 1
             day_number = 1
             hour = 8
             minute = 0
             second = 0
+        elif r[1] == 'hour':
+            hour = r[2]
+        elif r[1] = 'timezone':
+            timezone = r[2]
+
     
     # check if am or pm is separated from the time. If it is, join them
     for i in range(1, len(words)):
@@ -455,6 +547,12 @@ def parse(text, language='en', base_date=None):
             if year > 2030 or year < 2020:
                 return None
         
+        #### FIND QUARTER ######
+        if word[0] == 'q' and word[1:].isdigit():
+            quarter = int(word[1:])
+            if quarter > 4 or quarter < 1:
+                return None
+            
         #### FIND DATE SEPARATED BY DASH OR SLASH ######
         separator = None
         if '-' in word:
@@ -477,13 +575,14 @@ def parse(text, language='en', base_date=None):
                 else:
                     day_number = 1
             
-            # locale.setlocale(locale.LC_ALL, 'en-gb')
-            # d.strftime('%x')
+        #### FIND TIMEZONE ###
+        # if word in pytz.common_timezones:
+        #     timezone = word
 
-    # print("calling future", year, month, day_number, days, weekday, hour, minute, second, especial, weeks, years, months)
+    # print("calling future", year, month, day_number, days, weekday, hour, minute, second, especial, weeks, years, months, quarter)
     return future_datetime(base_date=base_date, especial=especial, days=days, weekday=weekday, 
         day_number=day_number, month=month, year=year, hour=hour, minute=minute, second=second,
-        weeks=weeks, years=years, months=months)
+        weeks=weeks, years=years, months=months, quarter=quarter, timezone=timezone)
     
 
 def words_to_datepart(text, language='en'):
@@ -506,8 +605,8 @@ def words_to_datepart(text, language='en'):
     
     
     
-if __name__ == '__main__': 
+# if __name__ == '__main__': 
     
-    language = 'en'
+#     language = 'en'
 
-    print(parse(sys.argv[1]))
+#     print(parse(sys.argv[1]))
