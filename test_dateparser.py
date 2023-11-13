@@ -2,6 +2,8 @@ import unittest
 from dateparser import parse
 from datetime import datetime
 
+import pytz
+
 class TestDateParser(unittest.TestCase):
 
     def test_tomorrow(self):
@@ -311,22 +313,42 @@ class TestDateParser(unittest.TestCase):
         self.assertEqual(parse('9 p.m.', base_date=base_date), expected_date)
 
 
-    # def test_hour_and_timezone(self):
-    #     # test 5am CT
+    def test_hour_and_timezone(self):
+        # test 5am CT
+        base_date = datetime(2023, 7, 10, 16, 22)
+        expected_tz = pytz.timezone('US/Central')
+        expected_date = datetime(2023, 7, 11, 5, 0, tzinfo=expected_tz)
+        
+        tz = pytz.timezone('US/Central')
+        self.assertEqual(parse('5am CT', base_date=base_date, locale_timezone=tz), expected_date)
 
-    #     # test 6pm Buenos Aires
-    #     pass
+        # test 6pm Buenos Aires
+        base_date = datetime(2023, 7, 10, 16, 22)
+        expected_tz = pytz.timezone('America/Argentina/Buenos_Aires')
+        expected_date = datetime(2023, 7, 11, 5, 0, tzinfo=expected_tz)
+        tz = pytz.timezone('US/Central')
+        self.assertEqual(parse('5am Buenos Aires', base_date=base_date, locale_timezone=tz), expected_date)
+        
 
-    # def test_hour_minute(self):
-    #     # test 5:30
+    def test_hour_minute(self):
+        # test 5:30
+        base_date = datetime(2023, 7, 10, 16, 22)
+        expected_date = datetime(2023, 7, 11, 5, 30)
+        self.assertEqual(parse('5:30', base_date=base_date), expected_date)
 
-    #     # test 05:30
+        # test 05:30
+        base_date = datetime(2023, 7, 10, 16, 22)
+        expected_date = datetime(2023, 7, 11, 5, 30)
+        self.assertEqual(parse('05:30', base_date=base_date), expected_date)
 
-    #     # test 17 25
+        # test 5:30pm
+        base_date = datetime(2023, 7, 10, 16, 22)
+        expected_date = datetime(2023, 7, 10, 17, 30)
+        self.assertEqual(parse('05:30pm', base_date=base_date), expected_date)
 
-    #     # test 5:30pm
+              
 
-    #     pass
+        pass
 
     # def test_just_day_ordinal(self):
     #     # test 1st
@@ -450,6 +472,17 @@ class TestDateParser(unittest.TestCase):
     #     # test in 9 mins
     #     pass
 
+    # def test_numbers
+    
+    # test 17 25
+    # test 0800 (format like military time)
+    # test 05 06 2023 (US)
+    # test 05 06 2023 (UK)
+    # test 05 06 24 (UK)
+    # test 05 06 24 (UK)
+    # test 
+    # test 19 02 2024 12:30
+        
     
 if __name__ == '__main__':
     unittest.main()

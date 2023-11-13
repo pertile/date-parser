@@ -87,9 +87,9 @@ GLOSSARY = {
         ('qtwo', 'quarter', 2),
         ('qthree', 'quarter', 3),
         ('qfour', 'quarter', 4),
-        # ('CT', 'timezone', 'America/Chicago'),
-        # ('CST', 'timezone', 'America/Chicago'),
-        # ('Central', 'timezone', 'America/Chicago'),
+        ('ct', 'timezone', 'America/Chicago'),
+        ('cst', 'timezone', 'America/Chicago'),
+        ('central', 'timezone', 'America/Chicago'),
     ],
     'es': [
         ('manana', 'especial', Especial.TOMORROW),
@@ -142,9 +142,9 @@ GLOSSARY = {
         ('siguiente año', 'years', 1),
         ('proximo mes', 'months', 1),
         ('proximo ano', 'years', 1),
-        # ('CT', 'timezone', 'America/Chicago'),
-        # ('CST', 'timezone', 'America/Chicago'),
-        # ('Central', 'timezone', 'America/Chicago'),
+        ('ct', 'timezone', 'America/Chicago'),
+        ('cst', 'timezone', 'America/Chicago'),
+        ('central', 'timezone', 'America/Chicago'),
 
     ],
 }
@@ -157,7 +157,7 @@ def next_weekday(date, weekday):
 
 def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, months=0, 
     year=None, years=0, hour=None, hours=0, minute=None, minutes=0, second=None, seconds=0, 
-    quarter=None, timezone=None, especial=None, base_date=None):
+    quarter=None, timezone=None, especial=None, base_date=None, locale_timezone=None):
 
     # if it is an especial day it doesn't consider any other information about date
     
@@ -178,7 +178,7 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
 
     HOURS_LATER = 4
     if base_date is None:
-        base_date = datetime.now()
+        base_date = datetime.now(locale_timezone)
     base_weekday = base_date.weekday()
     base_month = base_date.month
     base_year = base_date.year
@@ -411,7 +411,7 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
         second = base_date.second
 
     # print(year, month, day_number, hour, minute, second, years, months, days, weeks, hours, minutes, seconds)
-    result = datetime(year, month, day_number, hour, minute, second, microsecond=0) + relativedelta(years=years, 
+    result = datetime(year, month, day_number, hour, minute, second, microsecond=0, tzinfo=timezone) + relativedelta(years=years, 
         months=months, days=days, weeks=weeks, hours=hours, minutes=minutes, seconds=seconds)
 
     if  result > base_date:
@@ -420,29 +420,42 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
         return None
     
 
-def parse(text, language='en', base_date=None):
+def parse(text, language='en', base_date=None, locale_timezone=None):
     if base_date is None:
         base_date = datetime.now()
+
+    if base_date.tzinfo is None and locale_timezone is not None:
+        base_date = base_date.replace(tzinfo=locale_timezone)
 
     text = normalize(text)
     words = text.split(" ")
     results = []
     
+    timezone = None
     #### FIND WORDS ######
     # start looking for 3 words phrases, then 2 words phrases and finally 1 word
     for size in range(3, 0, -1):
         # stop looking at len(words) - size, so if there are 10 words you can only look up to 8th word for a 3 words prhase
         for i in range(len(words) - size + 1):
             # print(f"Position {i} of {len(words)-size}. Word:")
-            
+            word = ' '.join(words[i:i+size])
             # conditional to avoid looking for erased words
             if words[i] is not None:
                 # print(words[i:i+size])
-                result = words_to_datepart(' '.join(words[i:i+size]), language)
+                result = words_to_datepart(word, language)
                 if result is not None:
                     results.append(result)
                     # set words to None so they aren't considered again
                     words[i:i+size] = [None] * size
+        
+            #### FIND TIMEZONE ONLY AT THE END ###
+            if i == len(words) - size:
+                if tz := get_timezone(word): 
+                    timezone = tz
+                    
+                    words[i:i+size] = [None] * size
+
+           
         # remove empty words (erased words because they are part of a phrase)
         words[:] =  (value for value in words if value != None)
     
@@ -498,8 +511,8 @@ def parse(text, language='en', base_date=None):
             second = 0
         elif r[1] == 'hour':
             hour = r[2]
-        elif r[1] = 'timezone':
-            timezone = r[2]
+        elif r[1] == 'timezone':
+            timezone = pytz.timezone(r[2])
 
     
     # check if am or pm is separated from the time. If it is, join them
@@ -522,6 +535,9 @@ def parse(text, language='en', base_date=None):
                 return None
         
         #### FIND HOUR ######
+        if ':' in word and word[-1] not in['.', 'm']:
+            word = word + 'am'
+
         if word[-2:] in ['am', 'pm'] or word[-4:] in ['a.m.', 'p.m.']:
             pm = False
             if 'p' in word:
@@ -575,14 +591,11 @@ def parse(text, language='en', base_date=None):
                 else:
                     day_number = 1
             
-        #### FIND TIMEZONE ###
-        # if word in pytz.common_timezones:
-        #     timezone = word
 
-    # print("calling future", year, month, day_number, days, weekday, hour, minute, second, especial, weeks, years, months, quarter)
+    # print("calling future", year, month, day_number, days, weekday, hour, minute, second, especial, weeks, years, months, quarter, timezone, locale_timezone)
     return future_datetime(base_date=base_date, especial=especial, days=days, weekday=weekday, 
         day_number=day_number, month=month, year=year, hour=hour, minute=minute, second=second,
-        weeks=weeks, years=years, months=months, quarter=quarter, timezone=timezone)
+        weeks=weeks, years=years, months=months, quarter=quarter, timezone=timezone, locale_timezone=locale_timezone)
     
 
 def words_to_datepart(text, language='en'):
@@ -602,11 +615,21 @@ def words_to_datepart(text, language='en'):
         # EXAMPLE: tomor for tomorrow and tomorow
         if len(set([x[1:] for x in items])) == 1:
             return items[0]
-    
-    
+
+def get_timezone(text):
+    if text is not None:
+        text = text.replace(' ', '_')
+        timezones = [pytz.timezone(tz) for tz in pytz.all_timezones if text.lower() in tz.lower()]
+
+        # if all timezones have the same offset, return the first timezone
+        if len(set([x.utcoffset(datetime.now()) for x in timezones])) == 1:
+            return timezones[0]
+    return None
     
 # if __name__ == '__main__': 
     
 #     language = 'en'
 
 #     print(parse(sys.argv[1]))
+
+# a function that receives a text as a parameter, it replaces spaces with underscores and get possible timezones for that word
