@@ -20,10 +20,12 @@ MAKE LOT OF TESTS
 # TODO: replace 8 with constant
 # TODO: replace 2nd element in glossary tuple with constants
 
+import calendar
 from enum import Enum
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import pytz
+import locale
 
 import unicodedata
 import sys
@@ -182,7 +184,8 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
     base_weekday = base_date.weekday()
     base_month = base_date.month
     base_year = base_date.year
-
+    
+    hour_was_none = hour is None
     if hour is None:
         hour = 8
     if minute is None:
@@ -225,9 +228,7 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
 
 
     if years == 0 and months == 0 and days == 0 and hours == 0 and minutes == 0 and seconds == 0 and weeks == 0:
-        hour_was_none = hour is None
-
-
+        
         if weekday is not None:
         # only weekday, just look for next weekday
             if day_number is None and month is None and year is None:
@@ -341,6 +342,7 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
         plus_day = 0
         plus_month = 0
         plus_year = 0
+        day_was_none = day_number is None
         if day_number is None:
             if month is not None or quarter is not None or year is not None:
                 day_number = 1
@@ -370,15 +372,62 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
         # if I don't have a year it should be current year, EXCEPT:
         # if month is before base_month or month equals base_month and day_number is before base_day_number
         # in that case it should be next year
+        year_was_none = year is None
         if year is None:
             year = base_year
-            if month < base_month or (month == base_month and day_number < base_date.day):
+            if (not month_was_none or quarter is not None) and (month < base_month or (month == base_month and day_number < base_date.day)):
                 plus_year = 1
+
+        if day_number > 31:
+            return None
+
+        if month > 12:
+            return None
         
-        temp_date = datetime(year, month, day_number) + relativedelta(days=plus_day, months=plus_month, years=plus_year)
-        day_number = temp_date.day
-        month = temp_date.month
-        year = temp_date.year
+        # all of the next could be in a function that receives day, month and year and tries to 
+        # make them consistent (29th Feb no year in July 2024 -> 2028-02-29)
+        new_month = (month + plus_month) % 12
+        new_year = year + plus_year + (month + plus_month) // 12
+        first_day_temp = datetime(new_year, new_month, 1)
+
+        # if my new date is 29, 30 or 31 in a month that doesn't have that day, or it is the last day of the month and hour is before base_hour 
+        # I have to add: a month if month was none, or a day if month was present. I have to do it up to date is consistent
+        # This could be the case when you ask for a 29 Feb in Jun 2024, it will add a year until it gets year 2028
+        # or if you are on 31st August 7 pm and you ask for 31st 5 pm, it will add a month and will get September 31
+        # so it has to add another month in order to get October 31
+
+        max_day = calendar.monthrange(first_day_temp.year, first_day_temp.month)[1]
+            
+        if max_day < day_number or (max_day == day_number and datetime(year, month, day_number, hour, minute, second) <= base_date):
+            while True:
+                # if day, nor month nor year are present then you add a day
+                # I think this case is never used
+                # Example: 6 pm and now is 8 pm, you have to add a day
+                if day_was_none and month_was_none and year_was_none:
+                    plus_day = plus_day + 1
+                    first_day_temp = first_day_temp + relativedelta(days=1)    
+                    max_day = calendar.monthrange(first_day_temp.year, first_day_temp.month)[1]
+                # if month is not present you can add a month
+                # Example: 30th of June and you ask for 31st, you have to add a month to get August
+                # Example: 31st August 8 pm and you ask for 31st 10 am, you have to add a monther to see if next month has 31
+                # Example: 31st December 8 pm and you ask for 31st 10 am, you have to add a month to see if next month (January next year) has 31
+                elif month_was_none:
+                    plus_month = plus_month + 1
+                    first_day_temp = first_day_temp + relativedelta(months=1)    
+                    max_day = calendar.monthrange(first_day_temp.year, first_day_temp.month)[1]
+                # if year is not present you can add a year
+                # Example: 15th March 2024 and you ask for 29th of February, you have to add year so you test if next year is leap
+                elif year_was_none:
+                    plus_year = plus_year + 1
+                    first_day_temp = first_day_temp + relativedelta(years=1)
+                    max_day = calendar.monthrange(first_day_temp.year, first_day_temp.month)[1]
+                
+                if max_day >= day_number:
+                    break
+
+        day_number = day_number + plus_day
+        year = year + plus_year + (month + plus_month) // 12
+        month = (month + plus_month) % 12
 
 
     #     # print(year, month, day_number)
@@ -409,18 +458,18 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
         minute = base_date.minute
     if second is None:
         second = base_date.second
-
+    
     # print(year, month, day_number, hour, minute, second, years, months, days, weeks, hours, minutes, seconds)
     result = datetime(year, month, day_number, hour, minute, second, microsecond=0, tzinfo=timezone) + relativedelta(years=years, 
         months=months, days=days, weeks=weeks, hours=hours, minutes=minutes, seconds=seconds)
-
+    
     if  result > base_date:
         return result
     else:
         return None
     
 
-def parse(text, language='en', base_date=None, locale_timezone=None):
+def parse(text, language='en', base_date=None, locale_timezone=None, locale_format="en_US"):
     if base_date is None:
         base_date = datetime.now()
 
@@ -447,13 +496,13 @@ def parse(text, language='en', base_date=None, locale_timezone=None):
                     results.append(result)
                     # set words to None so they aren't considered again
                     words[i:i+size] = [None] * size
-        
-            #### FIND TIMEZONE ONLY AT THE END ###
-            if i == len(words) - size:
-                if tz := get_timezone(word): 
-                    timezone = tz
-                    
-                    words[i:i+size] = [None] * size
+                else:
+                    #### FIND TIMEZONE ONLY AT THE END ###
+                    if i == len(words) - size:
+                        if tz := get_timezone(word): 
+                            timezone = tz
+                            
+                            words[i:i+size] = [None] * size
 
            
         # remove empty words (erased words because they are part of a phrase)
@@ -582,16 +631,47 @@ def parse(text, language='en', base_date=None, locale_timezone=None):
         
         if separator is not None:
             date_array = word.split(separator)
-            # year is at the beginning, is yyyy-mm or yyyy-mm-dd
-            if len(date_array[0]) == 4:
-                year = int(date_array[0])
-                month = int(date_array[1])
-                if len(date_array) == 3:
-                    day_number = int(date_array[2])
-                else:
-                    day_number = 1
+            year_is_in = None
+            month_is_in = None
+            day_is_in = None
+            
+            # year is at the beginning and it has 4 digits
+            if len(date_array[0]) == 4 and date_array[0].isdigit():
+                year_is_in = 0
+            # year is at the end (it could be a two part or three part date) and it has 4 digits
+            elif len(date_array[-1]) == 4 and date_array[-1].isdigit():
+                year_is_in = len(date_array) - 1
+            
+            # GET MONTH IF IT IS NOT DIGIT
+            for i, part in enumerate(date_array):
+                if not part.isdigit():
+                    month_is_in = i
+                    break
+            
+            # GET DAY IF IT IS A 3-PART DATE AND ALREADY HAVE YEAR AND MONTH
+            if month_is_in is not None and year_is_in is not None and len(date_array) == 3:
+                day_is_in = list({0,1,2} - {year_is_in, month_is_in})[0]
+
+            if year_is_in is not None + month_is_in is not None + day_is_in is not None == len(date_array):
+                break
+
+            for i, part in enumerate(date_array):
+                if part.isdigit() and i != year_is_in and int(part) < 32:
+                    day_is_in = i
+                    break
+            
+            monthdate_format = get_locale_monthdate(locale_format)
+
             
 
+
+            year = int(date_array[year_is_in]) if year_is_in is not None else None
+            month = int(date_array[month_is_in]) if month_is_in is not None else None
+            if month is not None and not month.isdigit():
+                month = words_to_datepart(month, language=language)[2]
+            day_number = int(date_array[day_is_in]) if day_is_in is not None else None
+
+            
     # print("calling future", year, month, day_number, days, weekday, hour, minute, second, especial, weeks, years, months, quarter, timezone, locale_timezone)
     return future_datetime(base_date=base_date, especial=especial, days=days, weekday=weekday, 
         day_number=day_number, month=month, year=year, hour=hour, minute=minute, second=second,
@@ -625,6 +705,23 @@ def get_timezone(text):
         if len(set([x.utcoffset(datetime.now()) for x in timezones])) == 1:
             return timezones[0]
     return None
+
+def get_locale_monthdate(locale_format):
+    locale.setlocale(locale.LC_ALL, locale_format)
+    MONTH = 8
+    DAY = 6
+    test_date = datetime(2023,MONTH,DAY)
+    test = test_date.strftime('%x')
+    separator = [x for x in test if not x.isdigit()][0]
+    date_array = test.split(separator)
+    day = None
+    month = None
+    for i, val in enumerate(date_array):
+        if int(val) == DAY:
+            day = i
+        elif int(val) == MONTH:
+            month = i
+    return (month, day)
     
 # if __name__ == '__main__': 
     

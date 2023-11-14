@@ -346,72 +346,134 @@ class TestDateParser(unittest.TestCase):
         expected_date = datetime(2023, 7, 10, 17, 30)
         self.assertEqual(parse('05:30pm', base_date=base_date), expected_date)
 
-              
 
+    def test_just_day_ordinal(self):
+        # test 1st
+        base_date = datetime(2023, 7, 10, 16, 22)
+        expected_date = datetime(2023, 8, 1, 8, 0)
+        self.assertEqual(parse('1st', base_date=base_date), expected_date)
+
+        # test 02nd
+        base_date = datetime(2023, 7, 10, 16, 22)
+        expected_date = datetime(2023, 8, 2, 8, 0)
+        self.assertEqual(parse('02nd', base_date=base_date), expected_date)
+
+        # test 3rd
+        base_date = datetime(2023, 7, 10, 16, 22)
+        expected_date = datetime(2023, 8, 3, 8, 0)
+        self.assertEqual(parse('3rd', base_date=base_date), expected_date)
+
+        # test 08th
+        base_date = datetime(2023, 12, 10, 16, 22)
+        expected_date = datetime(2024, 1, 8, 8, 0)
+        self.assertEqual(parse('08th', base_date=base_date), expected_date)
+
+        # test 31th in a month with 30 days
+        base_date = datetime(2023, 6, 10, 16, 22)
+        expected_date = datetime(2023, 7, 31, 8, 0)
+        self.assertEqual(parse('31st', base_date=base_date), expected_date)
+
+        # test 31st in a month with 31 days
+        base_date = datetime(2023, 7, 15, 16, 22)
+        expected_date = datetime(2023, 7, 31, 8, 0)
+        self.assertEqual(parse('31st', base_date=base_date), expected_date)
+
+        # test 31th in a month with 30 days last_day of month
+        base_date = datetime(2023, 6, 30, 16, 22)
+        expected_date = datetime(2023, 7, 31, 8, 0)
+        self.assertEqual(parse('31st', base_date=base_date), expected_date)
+
+        # test 31th in a month with 31 days last_day of month
+        base_date = datetime(2023, 8, 31, 16, 22)
+        expected_date = datetime(2023, 10, 31, 8, 0)
+        self.assertEqual(parse('31st', base_date=base_date), expected_date)
+
+        # test 32th
+        base_date = datetime(2023, 7, 31, 16, 22)
+        expected_date = None
+        self.assertEqual(parse('32th', base_date=base_date), expected_date)
+
+
+    def test_just_month(self):
+        # test January
+        base_date = datetime(2023, 7, 10, 16, 22)
+        expected_date = datetime(2024,1,1,8)
+        self.assertEqual(parse('January', base_date=base_date), expected_date)
+
+        # test Feb
+        base_date = datetime(2023, 1, 10, 16, 22)
+        expected_date = datetime(2023,2,1,8)
+        self.assertEqual(parse('February', base_date=base_date), expected_date)
+
+
+        # test Marc
+        base_date = datetime(2023, 7, 10, 16, 22)
+        expected_date = datetime(2024,3,1,8)
+        self.assertEqual(parse('Marc', base_date=base_date), expected_date)
+
+
+    def test_just_year(self):
+        base_date = datetime(2023, 7, 10, 16, 22)
+        expected_date = datetime(2024,1,1,8)
+        self.assertEqual(parse('2024', base_date=base_date), expected_date)
+        
+    def test_day_and_month(self):
+        # test 1st April
+        base_date = datetime(2023, 7, 10, 16, 22)
+        expected_date = datetime(2024,4,1,8)
+        self.assertEqual(parse('1st April', base_date=base_date), expected_date)
+
+        # test 02 May
+        base_date = datetime(2023, 2, 10, 16, 22)
+        expected_date = datetime(2023,5,1,8)
+        self.assertEqual(parse('02 May', base_date=base_date), expected_date)
+
+        # test 03rd Jun
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2023,6,3,8)
+        self.assertEqual(parse('03rd Jun', base_date=base_date), expected_date)
+
+    def test_leap_day(self):
+        # test 29th Feb in July 2024
+        base_date = datetime(2024, 7, 1, 16, 22)
+        expected_date = datetime(2028,2,29,8)
+        self.assertEqual(parse('29th Feb', base_date=base_date), expected_date)
+        
+
+    def test_day_month_year(self):
+        # test 4th July 2023
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2023,7,4,8)            
+        self.assertEqual(parse('4th July 2023', base_date=base_date), expected_date)
+
+        # test 05th Augu 2024
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2024,8,5,8)
+        self.assertEqual(parse('05th Augu 2024', base_date=base_date), expected_date)        
+
+
+    def test_day_and_month_separated_by_slash_dash_or_hyphen(self):
+        # test 7-Oct
+        # base_date = datetime(2023, 6, 1, 16, 22)
+        # expected_date = datetime(2023,10,7,8)
+        # self.assertEqual(parse('7-Oct', base_date=base_date), expected_date)
+
+        # test 08/Nove
+
+        # test 9-12 with locale set to US
+
+        # test 9-12 with locale set to UK
+
+        # test 10/01 with locale set to US
+
+        # test 10/01 with locale set to UK
+
+        # test 11\Febr
+
+        # test 12–April (dash is not hyphen)
         pass
 
-    # def test_just_day_ordinal(self):
-    #     # test 1st
-
-    #     # test 02nd
-
-    #     # test 3rd
-
-    #     # test 08th
-
-    #     # test 31th
-
-    #     # test 32th
-    #     pass
-
-    # def test_just_month(self):
-    #     # test January
-
-    #     # test Feb
-
-    #     # test Marc
-    #     pass
-
-    # def test_just_year(self):
-    #     # test 2024
-    #     pass
-        
-    # def test_day_and_month(self):
-    #     # test 1st April
-
-    #     # test 02 May
-
-    #     # test 03rd Jun
-
-    #     pass
-
-    # def test_day_month_year(self):
-    #     # test 4th July 2023
-
-    #     # test 05th Augu 24
-
-    #     # test 6 Septem 2031
-    #     pass
-
-    # def test_day_and_month_separated_by_slash_dash_or_hyphen(self):
-    #     # test 7-Oct
-
-    #     # test 08/Nove
-
-    #     # test 9-12 with locale set to US
-
-    #     # test 9-12 with locale set to UK
-
-    #     # test 10/01 with locale set to US
-
-    #     # test 10/01 with locale set to UK
-
-    #     # test 11\Febr
-
-    #     # test 12–April (dash is not hyphen)
-    #     pass
-
-    # def test_day_month_year_separated_by_slash_dash_or_hyphen(self):
+    def test_day_month_year_separated_by_slash_dash_or_hyphen(self):
     #     # test 13-May-2024
 
     #     # test 14/Jun/24
@@ -420,10 +482,15 @@ class TestDateParser(unittest.TestCase):
 
     #     # test 16–7–2033 (dash is not hyphen)
 
-    #     # test 2024-08-05
+        # test 2024-08-05
+            base_date = datetime(2023, 6, 1, 16, 22)
+            expected_date = datetime(2024,8,5,8)
+            self.assertEqual(parse('2024-08-05', base_date=base_date), expected_date)
 
-    #     # test 2023-9-6
-    #     pass
+        # test 2023-9-6
+            base_date = datetime(2023, 6, 1, 16, 22)
+            expected_date = datetime(2023,9,6,8)
+            self.assertEqual(parse('2023-9-6', base_date=base_date), expected_date)
 
     # def test_in_days(self):
     #     # test in 5 days
@@ -476,6 +543,7 @@ class TestDateParser(unittest.TestCase):
     
     # test 17 25
     # test 0800 (format like military time)
+    # test 6 Septem 2031
     # test 05 06 2023 (US)
     # test 05 06 2023 (UK)
     # test 05 06 24 (UK)
@@ -483,6 +551,7 @@ class TestDateParser(unittest.TestCase):
     # test 
     # test 19 02 2024 12:30
         
-    
+
+
 if __name__ == '__main__':
     unittest.main()
