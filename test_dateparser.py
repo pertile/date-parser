@@ -4,6 +4,7 @@ from datetime import datetime
 
 import pytz
 
+# py test_dateparser.py TestDateParser.test_just_month
 class TestDateParser(unittest.TestCase):
 
     def test_tomorrow(self):
@@ -454,43 +455,80 @@ class TestDateParser(unittest.TestCase):
 
     def test_day_and_month_separated_by_slash_dash_or_hyphen(self):
         # test 7-Oct
-        # base_date = datetime(2023, 6, 1, 16, 22)
-        # expected_date = datetime(2023,10,7,8)
-        # self.assertEqual(parse('7-Oct', base_date=base_date), expected_date)
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2023,10,7,8)
+        self.assertEqual(parse('7-Oct', base_date=base_date), expected_date)
 
         # test 08/Nove
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2023,11,8,8)
+        self.assertEqual(parse('08/Nove', base_date=base_date), expected_date)
 
         # test 9-12 with locale set to US
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2023,9,12,8)
+        self.assertEqual(parse('9-12', base_date=base_date), expected_date)
 
-        # test 9-12 with locale set to UK
+        # test 9-12 with locale set to GB
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2023,12,9,8)
+        self.assertEqual(parse('9-12', base_date=base_date, locale="en_GB"), expected_date)
 
         # test 10/01 with locale set to US
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2023,10,1,8)
+        self.assertEqual(parse('10/01', base_date=base_date), expected_date)
 
         # test 10/01 with locale set to UK
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2024,1,10,8)
+        self.assertEqual(parse('10/01', base_date=base_date, locale="en_GB"), expected_date)
 
         # test 11\Febr
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2024,2,11,8)
+        self.assertEqual(parse('11\Feb', base_date=base_date), expected_date)
+
 
         # test 12–April (dash is not hyphen)
-        pass
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2024,4,12,8)
+        self.assertEqual(parse('12–April', base_date=base_date), expected_date)
+
 
     def test_day_month_year_separated_by_slash_dash_or_hyphen(self):
-    #     # test 13-May-2024
+    
+        # test 13-May-2024
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2024,5,13,8)
+        self.assertEqual(parse('13-May-2024', base_date=base_date), expected_date)
 
-    #     # test 14/Jun/24
+        # test 14/Jun/24
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2024,6,14,8)
+        self.assertEqual(parse('14/Jun/24', base_date=base_date), expected_date)
 
-    #     # test 15\06\2032
 
-    #     # test 16–7–2033 (dash is not hyphen)
+        # test 06\15\2032 locale US
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2032,6,15,8)
+        self.assertEqual(parse(r'06\15\2032', base_date=base_date), expected_date)
+
+
+        # test 16–7–2033 (dash is not hyphen) locale en_GB
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2033,7,16,8)
+        self.assertEqual(parse('16–7–2033', base_date=base_date, locale="en_GB"), expected_date)
 
         # test 2024-08-05
-            base_date = datetime(2023, 6, 1, 16, 22)
-            expected_date = datetime(2024,8,5,8)
-            self.assertEqual(parse('2024-08-05', base_date=base_date), expected_date)
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2024,8,5,8)
+        self.assertEqual(parse('2024-08-05', base_date=base_date), expected_date)
 
         # test 2023-9-6
-            base_date = datetime(2023, 6, 1, 16, 22)
-            expected_date = datetime(2023,9,6,8)
-            self.assertEqual(parse('2023-9-6', base_date=base_date), expected_date)
+        base_date = datetime(2023, 6, 1, 16, 22)
+        expected_date = datetime(2023,9,6,8)
+        self.assertEqual(parse('2023-9-6', base_date=base_date), expected_date)
 
     # def test_in_days(self):
     #     # test in 5 days

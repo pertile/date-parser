@@ -25,7 +25,7 @@ from enum import Enum
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import pytz
-import locale
+import locale as lc
 
 import unicodedata
 import sys
@@ -150,6 +150,50 @@ GLOSSARY = {
 
     ],
 }
+def get_locale_monthdate(locale):
+    lc.setlocale(lc.LC_ALL, locale)
+    MONTH = 8
+    DAY = 6
+    test_date = datetime(2023,MONTH,DAY)
+    test = test_date.strftime('%x')
+    separator = [x for x in test if not x.isdigit()][0]
+    date_array = test.split(separator)
+    day = None
+    month = None
+    for i, val in enumerate(date_array):
+        if int(val) == DAY:
+            day = i
+        elif int(val) == MONTH:
+            month = i
+    return (month, day)
+
+def can_be_year(year, base_date):
+    if isinstance(year, str):
+        if year.isdigit():
+            year = int(year)
+        else:
+            return None
+    if year < 100:
+        year = year + 2000
+    return year >= base_date.year and year <= base_date.year + 10
+
+def can_be_day(day):
+    if isinstance(day, str):
+        if day.isdigit():
+            day = int(day)
+        else:
+            return None
+    return day < 32
+
+
+def can_be_month(month):
+    if isinstance(month, str):
+        if month.isdigit():
+            month = int(month)
+        else:
+            return None
+    return month < 13
+
 def next_weekday(date, weekday):
     days_ahead = weekday - date.weekday()
     if days_ahead < 0: # Target day already happened this week
@@ -386,8 +430,13 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
         
         # all of the next could be in a function that receives day, month and year and tries to 
         # make them consistent (29th Feb no year in July 2024 -> 2028-02-29)
-        new_month = (month + plus_month) % 12
-        new_year = year + plus_year + (month + plus_month) // 12
+        
+        # as month is 1-based instead of 0-based I have to convert it to 0-based (substract 1) and then back to 1-based (add 1)
+        # so I can use the modulo properly
+        new_month = (month - 1 + plus_month) % 12 + 1
+        # as month is 1-based instead of 0-based I have to convert it to 0-based (substract 1) to use // 12 properly to get years to add
+        new_year = year + plus_year + (month - 1 + plus_month) // 12
+
         first_day_temp = datetime(new_year, new_month, 1)
 
         # if my new date is 29, 30 or 31 in a month that doesn't have that day, or it is the last day of the month and hour is before base_hour 
@@ -424,10 +473,10 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
                 
                 if max_day >= day_number:
                     break
-
+        
         day_number = day_number + plus_day
-        year = year + plus_year + (month + plus_month) // 12
-        month = (month + plus_month) % 12
+        year = year + plus_year + (month - 1 + plus_month) // 12
+        month = (month - 1 + plus_month) % 12 + 1
 
 
     #     # print(year, month, day_number)
@@ -469,7 +518,7 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
         return None
     
 
-def parse(text, language='en', base_date=None, locale_timezone=None, locale_format="en_US"):
+def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_US"):
     if base_date is None:
         base_date = datetime.now()
 
@@ -629,6 +678,7 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale_form
         elif '–' in word:
             separator = '–'
         
+        # print(separator)
         if separator is not None:
             date_array = word.split(separator)
             year_is_in = None
@@ -638,37 +688,121 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale_form
             # year is at the beginning and it has 4 digits
             if len(date_array[0]) == 4 and date_array[0].isdigit():
                 year_is_in = 0
+                if len(date_array) == 3:
+                    month_is_in = 1
+                    day_is_in = 2
             # year is at the end (it could be a two part or three part date) and it has 4 digits
             elif len(date_array[-1]) == 4 and date_array[-1].isdigit():
                 year_is_in = len(date_array) - 1
             
+
             # GET MONTH IF IT IS NOT DIGIT
             for i, part in enumerate(date_array):
                 if not part.isdigit():
                     month_is_in = i
                     break
             
+            # GET THE MONTH IF IS A TWO-PART ARRAY AND ALREADY HAVE YEAR
+            if month_is_in is None and year_is_in is not None and len(date_array) == 2:
+                month_is_in = list({0,1} - {year_is_in})[0]
+
             # GET DAY IF IT IS A 3-PART DATE AND ALREADY HAVE YEAR AND MONTH
             if month_is_in is not None and year_is_in is not None and len(date_array) == 3:
                 day_is_in = list({0,1,2} - {year_is_in, month_is_in})[0]
 
-            if year_is_in is not None + month_is_in is not None + day_is_in is not None == len(date_array):
-                break
+            # Until here I get these options in a complete form:
+            # two parts date: yyyy-mm or mm-yyyy
+            # three parts date: yyyy and month in a string format, day by discarding
 
-            for i, part in enumerate(date_array):
-                if part.isdigit() and i != year_is_in and int(part) < 32:
-                    day_is_in = i
-                    break
-            
-            monthdate_format = get_locale_monthdate(locale_format)
+            # print("year is in, month is in, day is in", year_is_in, month_is_in, day_is_in)
 
-            
+            # if I still miss a param it could be that I got only the year or only the month
+            if (year_is_in is not None) + (month_is_in is not None) + (day_is_in is not None) < len(date_array):
 
+                # If I know the month could be Nov-24 (month and day or month and year) or 05-Nov-24 (or any other combination of 3 parts)
+                if month_is_in is not None:
+                    
+                    # if it is a two-parts date the other part is the day if it is less than 32
+                    # this could be an ambiguity: Nov-24 could be 24th of November or 2024-11-01, I assume it is 24th of November
+                    # but Nov-33 it is 2033-11-01
+                    if len(date_array) == 2:
+                        # get the other value that is not month
+                        value = date_array[not month_is_in]
+                        if value.isdigit():
+                            value = int(value)
+                            if value < 32:
+                                day_is_in = not month_is_in
+                            else:
+                                value = value + 2000
+                                if value >= base_date.year and value <= base_date.year + 10:
+                                    year_is_in = i
+                    else:
+                        # if it is a three-parts date, I have to see which of the others could be a year. If it is not a year the other could be the day
+                        for i, part in enumerate(date_array):
+                            if i != month_is_in and part.isdigit():
+                                part = int(part)
+                                if year_is_in is None and can_be_year(part, base_date):
+                                    year_is_in = i
+                                else:
+                                    if can_be_day(part):
+                                        day_is_in = i
+                        
+                # if month is not on a string format it is more difficult, we can have next options:
+                
+                # 1. Two-parts date:
+                # 1.a year and month
+                # 1.b month and day (preferred value, if you have 24-11 it is 24th of November and not 2024-11-01)
+                # 1.c year and day is not an option (24-31 could be 2031-01-24 or 2024-01-31 but it is not natural)
+                
+                # 2. Three-parts date: in that case I have to check locale format
+                
+                else:
+                    # returns a tuple where first element is month position and second is day position, i.e. in US is (0,1) in UK is (1,0)
+                    month_pos, day_pos = get_locale_monthdate(locale)
+
+                    if len(date_array) == 2:
+                        can_have_month = date_array[0].isdigit() and (can_be_month(date_array[0]) or can_be_month(date_array[1]))
+                        
+                        if can_have_month:
+                            # if the two can be months, the two can be days so I use locale
+                            if can_be_month(date_array[0]) and can_be_month(date_array[1]):
+                                if month_pos == 0:
+                                    month_is_in = 0
+                                    day_is_in = 1
+                                else:
+                                    month_is_in = 1
+                                    day_is_in = 0
+                            # first is month, second is day or year
+                            elif can_be_month(date_array[0]):
+                                month_is_in = 0
+                                if can_be_day(date_array[1]):
+                                    day_is_in = 1
+                                elif can_be_year(date_array[1]):
+                                    year_is_in = 1
+                            # second is month, first is day or year
+                            else:
+                                month_is_in = 1
+                                if can_be_day(date_array[0]):
+                                    day_is_in = 0
+                                elif can_be_year(date_array[0]):
+                                    year_is_in = 0
+                    # if I have 3 parts I just check positions according to locale
+                    elif len(date_array) == 3:
+                        if can_be_month(date_array[month_pos]) and can_be_day(date_array[day_pos]):
+                            month_is_in = month_pos
+                            day_is_in = day_pos
+                            year_is_in = list({0,1,2} - {month_pos, day_pos})[0]
 
             year = int(date_array[year_is_in]) if year_is_in is not None else None
-            month = int(date_array[month_is_in]) if month_is_in is not None else None
-            if month is not None and not month.isdigit():
-                month = words_to_datepart(month, language=language)[2]
+            year = year + 2000 if year is not None and year < 2000 else year
+
+            month = date_array[month_is_in] if month_is_in is not None else None
+            if month is not None:
+                if month.isdigit():
+                    month = int(month)
+                else:
+                    month = words_to_datepart(month, language=language)[2]
+            
             day_number = int(date_array[day_is_in]) if day_is_in is not None else None
 
             
@@ -706,23 +840,8 @@ def get_timezone(text):
             return timezones[0]
     return None
 
-def get_locale_monthdate(locale_format):
-    locale.setlocale(locale.LC_ALL, locale_format)
-    MONTH = 8
-    DAY = 6
-    test_date = datetime(2023,MONTH,DAY)
-    test = test_date.strftime('%x')
-    separator = [x for x in test if not x.isdigit()][0]
-    date_array = test.split(separator)
-    day = None
-    month = None
-    for i, val in enumerate(date_array):
-        if int(val) == DAY:
-            day = i
-        elif int(val) == MONTH:
-            month = i
-    return (month, day)
-    
+
+
 # if __name__ == '__main__': 
     
 #     language = 'en'
