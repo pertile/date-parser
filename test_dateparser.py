@@ -530,55 +530,125 @@ class TestDateParser(unittest.TestCase):
         expected_date = datetime(2023,9,6,8)
         self.assertEqual(parse('2023-9-6', base_date=base_date), expected_date)
 
-    # def test_in_days(self):
-    #     # test in 5 days
+    def test_in_days(self):
+        # test in 5 days
+        base_date = datetime(2023,11,16,5)
+        expected_date = datetime(2023,11,21,8)
+        self.assertEqual(parse('in 5 days', base_date=base_date), expected_date)
 
-    #     # test in 5 days and 3 hours
+        # test in 5 days and 3 hours
+        base_date = datetime(2023,11,16,9)
+        expected_date = datetime(2023,11,21,12)
+        self.assertEqual(parse('in 5 days and 3 hours', base_date=base_date), expected_date)
 
-    #     # test in 5 days 3 hours and 2 minutes
+        # test en 1 día y 7 horas (Spanish, one day and 7 hours)
+        base_date = datetime(2023,11,16,9)
+        expected_date = datetime(2023,11,17,16)
+        self.assertEqual(parse('en 1 día y 7 horas', base_date=base_date, language="es"), expected_date)
 
-    #     # test in 5 days 3 hours 2 minutes and 1 second
-    #     pass
+        # test in 2 days and 10 minutes
+        base_date = datetime(2023,11,16,9,55)
+        expected_date = datetime(2023,11,18,10,5)
+        self.assertEqual(parse('in 2 days and 10 minutes', base_date=base_date), expected_date)
 
-    # def test_in_months(self):
-    #     # test in 6 months
+        # test in a day
+        base_date = datetime(2023,11,16,9)
+        expected_date = datetime(2023,11,17,8)
+        self.assertEqual(parse('in a day', base_date=base_date), expected_date)
 
-    #     # test in 6 months and 4 days
+    def test_in_months(self):
+        # test in 6 months
+        base_date = datetime(2023,11,16,5)
+        expected_date = datetime(2024,5,16,8)
+        self.assertEqual(parse('in 6 months', base_date=base_date), expected_date)
 
-    #     # test in 6 months 4 days and 3 hours
-    #     pass
+        # test in 6 months and 4 days
+        base_date = datetime(2023,11,16,5)
+        expected_date = datetime(2024,5,20,8)
+        self.assertEqual(parse('in 6 months and 4 days', base_date=base_date), expected_date)
 
-    # def test_in_weeks(self):
-    #     # test in 4 weeks
+        # test en un mes (Spanish, in a month)
+        base_date = datetime(2023,11,16,5)
+        expected_date = datetime(2023,12,16,8)
+        self.assertEqual(parse('en un mes', base_date=base_date, language="es"), expected_date)
 
-    #     # test in 4 weeks and 2 days
+        
+    def test_in_weeks(self):
+        # test in 4 weeks
+        base_date = datetime(2023,11,16,5)
+        expected_date = datetime(2023,12,14,8)
+        self.assertEqual(parse('in 4 weeks', base_date=base_date), expected_date)
 
-    #     # test in 4 weeks 2 days and 1 hour
-    #     pass
+        # test in 4 weeks and 2 days
+        base_date = datetime(2023,11,16,5)
+        expected_date = datetime(2023,12,16,8)
+        self.assertEqual(parse('in 4 weeks and 2 days', base_date=base_date), expected_date)
+
+        # test in a week
+        base_date = datetime(2023,11,16,5)
+        expected_date = datetime(2023,11,23,8)
+        self.assertEqual(parse('in a week', base_date=base_date), expected_date)
     
-    # def test_in_years(self):
-    #     pass
+    def test_in_years(self):
+        # test in 2 years
+        base_date = datetime(2023,11,16,5)
+        expected_date = datetime(2025,11,16,8)
+        self.assertEqual(parse('in 2 years', base_date=base_date), expected_date)
 
-    # def test_in_quarters(self):
-    #     pass
+        # test in a year
+        base_date = datetime(2023,11,16,5)
+        expected_date = datetime(2024,11,16,8)
+        self.assertEqual(parse('in a year', base_date=base_date), expected_date)
 
-    # def test_in_fortnights(self):
-    #     pass
 
-    # def test_in_hours(self):
-    #     # test in 8 hours
+    def test_in_quarters(self):
+        # test in 3 quarters
+        base_date = datetime(2023,11,16,5)
+        expected_date = datetime(2024,7,1,8)
+        self.assertEqual(parse('in 3 quarters', base_date=base_date), expected_date)
 
-    #     # test in 8 hours and 5 minutes
+        # test en un trimestre (in a quarter, Spanish)
+        base_date = datetime(2023,11,16,5)
+        expected_date = datetime(2024,1,1,8)
+        self.assertEqual(parse('en un trimestre', base_date=base_date, language="es"), expected_date)
 
-    #     # test in 10 hrs
-    #     pass
+    def test_in_fortnights(self):
+        # test in 3 fortnights
+        base_date = datetime(2023,11,16,5)
+        expected_date = datetime(2023,12,28,8)
+        self.assertEqual(parse('in 3 fortnights', base_date=base_date), expected_date)
 
-    # def test_in_minutes(self):
-    #     # test in 9 mins
-    #     pass
+    def test_in_hours(self):
+        # test in 8 hours
+        base_date = datetime(2023,11,16,5)
+        expected_date = datetime(2023,11,16,13)
+        self.assertEqual(parse('in 8 hours', base_date=base_date), expected_date)
+
+        # test in 8 hours and 5 minutes
+        base_date = datetime(2023,11,16,5)
+        expected_date = datetime(2023,11,16,13,5)
+        self.assertEqual(parse('in 8 hours and 5 minutes', base_date=base_date), expected_date)
+
+        # test in 10 hrs
+        base_date = datetime(2023,11,16,5)
+        expected_date = datetime(2023,11,16,15)
+        self.assertEqual(parse('in 10 hrs', base_date=base_date), expected_date)
+
+        # test in an hour
+        base_date = datetime(2023,11,16,5)
+        expected_date = datetime(2023,11,16,6)
+        self.assertEqual(parse('in an hour', base_date=base_date), expected_date)
+
+    def test_in_minutes(self):
+        # test in 9 mins
+        base_date = datetime(2023,11,16,5, 17)
+        expected_date = datetime(2023,11,16,5,26)
+        self.assertEqual(parse('in 9 mins', base_date=base_date), expected_date)
 
     # def test_numbers
     
+    # test 24 (24th)
+    # test 33 (2033)
     # test 17 25
     # test 0800 (format like military time)
     # test 6 Septem 2031
