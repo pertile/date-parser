@@ -229,6 +229,23 @@ def can_be_month(month):
             return None
     return month < 13
 
+def can_be_hour(hour):
+    if isinstance(hour, str):
+        if hour.isdigit():
+            hour = int(hour)
+        else:
+            return None
+    return hour < 24
+
+def can_be_minute(minute):
+    if isinstance(minute, str):
+        if minute.isdigit():
+            minute = int(minute)
+        else:
+            return None
+    return minute < 60
+
+
 def next_weekday(date, weekday):
     days_ahead = weekday - date.weekday()
     if days_ahead < 0: # Target day already happened this week
@@ -564,6 +581,8 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
     if base_date.tzinfo is None and locale_timezone is not None:
         base_date = base_date.replace(tzinfo=locale_timezone)
 
+    month_pos, day_pos = get_locale_monthdate(locale)
+
     text = normalize(text)
     words = text.split(" ")
     results = []
@@ -595,17 +614,18 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
     glossary = GLOSSARY[language]
     indefinite_articles = [(word, result) for word, kind_term, result in glossary if 'value' == kind_term]
 
-
-    # replace "a" and "an" with 1
-    for i, word in enumerate(words):
-        for lookedupword, result in indefinite_articles:
-            if lookedupword == word:
-                words[i] = result
-
     if start is not None:
-    
         #in_phrase is the maximum length for an in phrase (i.e. "in 2 days and an hour", 6 words)
+        
+        # replace "a" and "an" with 1
+        for i, word in enumerate(words):
+            for lookedupword, result in indefinite_articles:
+                print("lookedupword, word, start, i: ", lookedupword, word, start, i)
+                if lookedupword == word and i >= start and i <= start + 6:
+                    words[i] = result    
+
         in_phrase = words[start: start+6]
+
         print("in phrase", in_phrase)
         relative_words = [(word, result) for word, kind_term, result in glossary if 'relative' == kind_term]
         print("relative_words", relative_words)
@@ -663,7 +683,7 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
             # remove empty words (erased words because they are part of a phrase)
             words[:] =  (value for value in words if value != None)
         
-        # print(results)
+        print(results)
         for r in results:
             if r[1] == 'especial':
                 if especial is None:
@@ -717,18 +737,18 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
             
         # remove empty words (erased am/pm)
         words[:] =  (value for value in words if value != None)
-        # print(words)
-        for word in words:
-            
+        for pos, word in enumerate(words):
+
             #### FIND DAY WITH ORDINALS ######    
             if word[0].isdigit() and word[-2:] in ['st', 'nd', 'rd', 'th']:
                 number = word[:-2]
                 try:
                     day_number = int(number)
+                    continue
                 except ValueError:
                     return None
             
-            #### FIND HOUR ######
+            #### FIND HOUR with semicolon, am or pm ######
             if ':' in word and word[-1] not in['.', 'm']:
                 word = word + 'am'
 
@@ -750,18 +770,30 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                     minute = int(time[1])
                 if len(time) > 2:
                     second = int(time[2])
+                continue
             
             #### FIND YEAR ######
-            if len(word) == 4 and word.startswith("20") and word.isdigit() and int(word) >= datetime.now().year and int(word) <= datetime.now().year + 10:
-                year = int(word)
-                if year > 2030 or year < 2020:
+            # print(word)
+            if len(word) == 4 and word.isdigit():
+                maybe_year = int(word)
+                if can_be_year(maybe_year, base_date):
+                    year = int(word)
+                    continue
+
+            #### FIND HOUR MILITARY FORMAT #####
+            if len(word) == 4 and word.isdigit():
+                hour = int(word[:2])
+                minute = int(word[2:])
+                if not can_be_hour(hour) or not can_be_minute(minute):
                     return None
-            
+                continue
+
             #### FIND QUARTER ######
             if word[0] == 'q' and word[1:].isdigit():
                 quarter = int(word[1:])
                 if quarter > 4 or quarter < 1:
                     return None
+                continue
                 
             #### FIND DATE SEPARATED BY DASH OR SLASH ######
             separator = None
@@ -854,8 +886,7 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                     
                     else:
                         # returns a tuple where first element is month position and second is day position, i.e. in US is (0,1) in UK is (1,0)
-                        month_pos, day_pos = get_locale_monthdate(locale)
-
+                        
                         if len(date_array) == 2:
                             can_have_month = date_array[0].isdigit() and (can_be_month(date_array[0]) or can_be_month(date_array[1]))
                             
@@ -900,9 +931,54 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                         month = words_to_datepart(month, language=language)[2]
                 
                 day_number = int(date_array[day_is_in]) if day_is_in is not None else None
+                continue
 
-            
-    print("calling future", year, month, day_number, days, weekday, hour, minute, second, especial, weeks, years, months, quarter, hours, minutes, timezone, locale_timezone)
+            ###### FIND JUST NUMBERS THAT COULD BE DAY, MONTH, YEAR, HOUR OR MINUTE ######
+            if word.isdigit():
+                number = int(word)
+                if month_pos == 0:
+                    if month is None and can_be_month(number):
+                        month = number
+                        continue
+                elif day_number is None and can_be_day(number):
+                        day_number = number
+                        continue
+                    
+                if month_pos == 1:
+                    if month is None and can_be_month(number):
+                        month = number
+                        continue
+                elif day_number is None and can_be_day(number):
+                        day_number = number
+                        continue
+                
+                # year as 4 digits was already treated, so 2 digits is onlye possibility
+                # 2 digit year only makes sense if you have month and month is before year, 
+                #   i.e "06 24" (June 2024) but not "24 06" nor "35 06" (24 and 35 can't represent year)
+                # day_number + year is nos natural i.e. "15 24"
+                # 32 to represent "year 2032" doesn't make sense neither
+                if year is None and can_be_year(number, base_date) and month is not None:
+                    year = number + 2000
+                    continue
+                if hour is None and can_be_hour(number):
+                    hour = number
+                    continue
+                if minute is None and can_be_minute(number):
+                    # if hour is nothing but previous is day_number, previous represents hour not day_number
+                    # i.e. "17 40", 17 could be day (first option), but 40 can only be minute, so 17 is hour
+                    # "17 24" also means hour and minute because day_number and year without month doesn't make sense
+                    # in "25 26" 25 only could be day (not hour) so 26 can't be minute
+                    if hour is None and day_number is not None and words[i-1].isdigit() and int(words[i-1]) == day_number and can_be_hour(day_number):
+                        hour = day_number
+                        day_number = None
+                    
+                    if hour is not None:
+                        minute = number
+                    
+                    continue
+
+
+    print(f"calling future: base_date {str(base_date)} especial {especial}\n year {year} quarter {quarter} month {month} day_number {day_number} hour {hour} minute {minute} \ntimezone {timezone} locale_timezone {locale_timezone} \nyears {years} quarters {quarters} months {months} weeks {weeks} days {days} hours {hours} minutes {minutes}")
     return future_datetime(base_date=base_date, especial=especial, days=days, weekday=weekday, 
         day_number=day_number, month=month, year=year, hour=hour, minute=minute, second=second,
         weeks=weeks, years=years, months=months, quarter=quarter, timezone=timezone, 
