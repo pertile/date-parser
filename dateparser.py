@@ -103,6 +103,8 @@ GLOSSARY = {
         ('mins', 'relative', 'minutes'),
         ('fortnights', 'relative', 'fortnights'),
         ('quarters', 'relative', 'quarters'),
+    ],
+    'en-articles': [
         ('a', 'value', '1'),
         ('an', 'value', '1'),
     ],
@@ -170,12 +172,14 @@ GLOSSARY = {
         ('minutos', 'relative', 'minutes'),
         ('quincenas', 'relative', 'fortnights'),
         ('trimestres', 'relative', 'quarters'),
+    ],
+    'es-articles': [
         ('un', 'value', '1'),
         ('una', 'value', '1'),
     ],
 }
 
-# TODO: only works with one word phrases (doesn'w find 'dentro de')
+# TODO: only works with one word phrases (doesn't find 'dentro de')
 def find_pos_in_glossary(phrase, kind, language="en"):
     glossary = GLOSSARY[language]
     phrase = phrase.split(" ")
@@ -275,9 +279,19 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
     # idem for months and years, if it is July and you ask for October without year will be same year
     # but if you as for March will be March next year
 
+    if (weekday is None and weeks == 0 and day_number is None and days == 0 and month is None and months == 0
+            and year is None and years == 0 and hour is None and hours == 0 and minute is None and minutes == 0
+            and second is None and seconds == 0 and quarter is None and quarters == 0 and especial is None):
+        
+        return None 
+
     HOURS_LATER = 4
     if base_date is None:
         base_date = datetime.now(locale_timezone)
+    
+    if timezone is None:
+        timezone = locale_timezone
+
     base_weekday = base_date.weekday()
     base_month = base_date.month
     base_year = base_date.year
@@ -612,7 +626,8 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
     # I found an "in" word
 
     glossary = GLOSSARY[language]
-    indefinite_articles = [(word, result) for word, kind_term, result in glossary if 'value' == kind_term]
+
+    indefinite_articles = [(word, result) for word, kind_term, result in GLOSSARY[language + '-articles']]
 
     if start is not None:
         #in_phrase is the maximum length for an in phrase (i.e. "in 2 days and an hour", 6 words)
@@ -620,22 +635,22 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
         # replace "a" and "an" with 1
         for i, word in enumerate(words):
             for lookedupword, result in indefinite_articles:
-                print("lookedupword, word, start, i: ", lookedupword, word, start, i)
+                # print("lookedupword, word, start, i: ", lookedupword, word, start, i)
                 if lookedupword == word and i >= start and i <= start + 6:
                     words[i] = result    
 
         in_phrase = words[start: start+6]
 
-        print("in phrase", in_phrase)
+        # print("in phrase", in_phrase)
         relative_words = [(word, result) for word, kind_term, result in glossary if 'relative' == kind_term]
-        print("relative_words", relative_words)
+        # print("relative_words", relative_words)
         relatives = {}
         for i, word in enumerate(in_phrase):
             for lookedupword, result in relative_words:
                 if lookedupword.startswith(word):
                     relatives[result] = in_phrase[i-1]
                     break
-        print("relatives", relatives)
+        # print("relatives", relatives)
         hours = int(relatives['hours']) if 'hours' in relatives else 0
 
         minutes = int(relatives['minutes']) if 'minutes' in relatives else 0
@@ -683,7 +698,7 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
             # remove empty words (erased words because they are part of a phrase)
             words[:] =  (value for value in words if value != None)
         
-        print(results)
+        # print(results)
         for r in results:
             if r[1] == 'especial':
                 if especial is None:
@@ -978,7 +993,7 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                     continue
 
 
-    print(f"calling future: base_date {str(base_date)} especial {especial}\n year {year} quarter {quarter} month {month} day_number {day_number} hour {hour} minute {minute} \ntimezone {timezone} locale_timezone {locale_timezone} \nyears {years} quarters {quarters} months {months} weeks {weeks} days {days} hours {hours} minutes {minutes}")
+    # print(f"calling future: base_date {str(base_date)} especial {especial}\n year {year} quarter {quarter} month {month} day_number {day_number} hour {hour} minute {minute} \ntimezone {timezone} locale_timezone {locale_timezone} \nyears {years} quarters {quarters} months {months} weeks {weeks} days {days} hours {hours} minutes {minutes}")
     return future_datetime(base_date=base_date, especial=especial, days=days, weekday=weekday, 
         day_number=day_number, month=month, year=year, hour=hour, minute=minute, second=second,
         weeks=weeks, years=years, months=months, quarter=quarter, timezone=timezone, 
@@ -1015,12 +1030,54 @@ def get_timezone(text):
         
     return None
 
-
-
-# if __name__ == '__main__': 
+def suggest(text, language='en', base_date=None, locale_timezone=None, locale="en_US", max_suggestions=4):
+    if base_date is None:
+        base_date = datetime.now()
+    if locale_timezone is not None:
+        base_date.replace(tzinfo=locale_timezone)
+    text = normalize(text)
     
-#     language = 'en'
+    first_result = parse(text, language=language, base_date=base_date, locale_timezone=locale_timezone, locale=locale)
+    if first_result is not None:
+        print("a match ", first_result)
+        return first_result
+    
+    glossary = GLOSSARY[language]
+    suggestions = []
+    for word, type, val in glossary:
+        if word.startswith(text):
+            if (type, val) not in [(s[1], s[2]) for s in suggestions]:
+                if type == "timezone":
+                    word = "10:00a.m. " + word
+                suggestions.append((word, type, val))
+        
+        if len(suggestions) >= max_suggestions:
+            break
+    if len(suggestions) < max_suggestions:
+        for word, type, val in glossary:
+            if text in word:
+                if (type, val) not in [(s[1], s[2]) for s in suggestions]:
+                    if type == "timezone":
+                        word = "10:00a.m. " + word
+                    suggestions.append((word, type, val))
+            
+            if len(suggestions) >= max_suggestions:
+                break
+    
+    if len(text.split()) == 1 and text.isdigit():
+        results.append(("in " + text + " days", None, None))
+        month = (base_date + relativedelta(months=1)).strftime("%B")
+        if can_be_day(text):
+            results.append((text + "-" + month, None, None))
+        if can_be_year(text):
+            results.append((text + "-" + month, None, None))
+        if can_be_hour(text):
+            results.append((text + ":00", None, None))
 
-#     print(parse(sys.argv[1]))
+    results = [(x, parse(x, language=language, base_date=base_date, locale_timezone=locale_timezone, locale=locale)) for x, _, _ in suggestions]
+    print("POSSIBLE DATES:")
+    for x in results:
+        print(x[0], x[1].strftime("%Y-%m-%d %H:%M:%S %Z%z"))
+    
 
-# a function that receives a text as a parameter, it replaces spaces with underscores and get possible timezones for that word
+suggest("33", locale_timezone=pytz.timezone('America/Buenos_Aires'))
