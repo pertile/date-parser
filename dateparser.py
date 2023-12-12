@@ -1,11 +1,11 @@
 '''
 It should be a function that receives: weekday, day number, month, year, hour, minute, second
-quarter, timezone, especial
+quarter, timezone, special
 all the other have None value as default
 
 it manages deterministic dates. They could be relative days (i.e. in two months and 5 days),
 absolute (i.e. January 2024, 2024-05-02 09:35 Central Time)
-or especial (especial.LATER, especial.WEEKEND, especial.TONIGHT)
+or special (Special.LATER, Special.WEEKEND, Special.TONIGHT)
 
 
 SUGGESTIONS
@@ -17,178 +17,75 @@ If you write "01-06" it suggests June 1st or January 6th depending on your langu
 
 MAKE LOT OF TESTS
 '''
-# TODO: replace 8 with constant
-# TODO: replace 2nd element in glossary tuple with constants
-
 import calendar
 from enum import Enum
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import pytz
 import locale as lc
+import json
 
 import unicodedata
 import sys
 
+
+LATER = 'LATER'
+WEEKEND = 'WEEKEND'
+TONIGHT = 'TONIGHT'
+TOMORROW = 'TOMORROW'
+NEXT_WEEK = 'NEXT_WEEK'
+NEXT_MONTH = 'NEXT_MONTH'
+NEXT_QUARTER = 'NEXT_QUARTER'
+NEXT_YEAR = 'NEXT_YEAR'
+
+DEFAULT_HOUR = 8
+TONIGHT_TIME = 20
+
+DAYS = 'days'
+WEEKDAY = 'weekday'
+MONTH = 'month'
+QUARTER = 'quarter'
+WEEKS = 'weeks'
+MONTHS = 'months'
+YEARS =  'years'
+HOUR = 'hour'
+TIMEZONE = 'timezone'
+AM_PM = ['am', 'pm', 'a.m.', 'p.m.', 'a.m', 'p.m', 'am.', 'pm.']
+ORDINALS = ['st', 'nd', 'rd', 'th']
+SEPARATORS = ['/', '-', '\\', '–']
+
+with open("glossary.json", "r") as read_file:
+    GLOSSARY = json.load(open("glossary.json", "r"))
+
+
+'''Return text without accents (á, ä, â, ñ, ç) and in lowercase.'''
 def normalize(input_str):
     nfkd_form = unicodedata.normalize('NFKD', input_str)
     return u"".join([c for c in nfkd_form if not unicodedata.combining(c)]).lower()
 
-class Especial(Enum):
-    LATER = 'later'
-    WEEKEND = 'weekend'
-    TONIGHT = 'tonight'
-    TOMORROW = 'tomorrow'
-    NEXT_WEEK = 'next_week'
-    NEXT_MONTH = 'next_month'
-    NEXT_QUARTER = 'next_quarter'
-    NEXT_YEAR = 'next_year'
 
-GLOSSARY = {
-    'en': [
-        ('tomorrow', 'especial', Especial.TOMORROW),
-        ('tmrw', 'especial', Especial.TOMORROW),
-        ('tomorow', 'especial', Especial.TOMORROW),
-        ('later', 'especial', Especial.LATER),
-        ('few', 'especial', Especial.LATER),
-        ('a few hours', 'especial', Especial.LATER),
-        ('tonight', 'especial', Especial.TONIGHT),
-        ('weekend', 'especial', Especial.WEEKEND),
-        ('next week', 'especial', Especial.NEXT_WEEK),
-        ('next month', 'especial', Especial.NEXT_MONTH),
-        ('next quarter', 'especial', Especial.NEXT_QUARTER),
-        ('next year', 'especial', Especial.NEXT_YEAR),
-        ('morning', 'hour', 8),
-        ('noon', 'hour', 12),
-        ('afternoon', 'hour', 13),
-        ('evening', 'hour', 20),
-        ('night', 'hour', 20),
-        ('midnight', 'hour', 0),
-        ('monday', 'weekday', 0),
-        ('tuesday', 'weekday', 1),
-        ('wednesday', 'weekday', 2),
-        ('thursday', 'weekday', 3),
-        ('friday', 'weekday', 4),
-        ('saturday', 'weekday', 5),
-        ('sunday', 'weekday', 6),
-        ('january', 'month', 1),
-        ('february', 'month', 2),
-        ('march', 'month', 3),
-        ('april', 'month', 4),
-        ('may', 'month', 5),
-        ('june', 'month', 6),
-        ('july', 'month', 7),
-        ('august', 'month', 8),
-        ('september', 'month', 9),
-        ('october', 'month', 10),
-        ('november', 'month', 11),
-        ('december', 'month', 12),
-        ('next month', 'months', 1),
-        ('next year', 'years', 1),
-        ('qone', 'quarter', 1),
-        ('qtwo', 'quarter', 2),
-        ('qthree', 'quarter', 3),
-        ('qfour', 'quarter', 4),
-        ('ct', 'timezone', 'America/Chicago'),
-        ('cst', 'timezone', 'America/Chicago'),
-        ('central', 'timezone', 'America/Chicago'),
-        ('in', 'in', ''),
-        ('days', 'relative', 'days'),
-        ('weeks', 'relative', 'weeks'),
-        ('months', 'relative', 'months'),
-        ('years', 'relative', 'years'),
-        ('hours', 'relative', 'hours'),
-        ('hrs', 'relative', 'hours'),
-        ('minutes', 'relative', 'minutes'),
-        ('mins', 'relative', 'minutes'),
-        ('fortnights', 'relative', 'fortnights'),
-        ('quarters', 'relative', 'quarters'),
-    ],
-    'en-articles': [
-        ('a', 'value', '1'),
-        ('an', 'value', '1'),
-    ],
-    'es': [
-        ('manana', 'especial', Especial.TOMORROW),
-        ('mnn', 'especial', Especial.TOMORROW),
-        ('despues', 'especial', Especial.LATER),
-        ('mas tarde', 'especial', Especial.LATER),
-        ('esta noche', 'especial', Especial.TONIGHT),
-        ('finde', 'especial', Especial.WEEKEND),
-        ('fin de semana', 'especial', Especial.WEEKEND),
-        ('siguiente semana', 'especial', Especial.NEXT_WEEK),
-        ('proxima semana', 'especial', Especial.NEXT_WEEK),
-        ('semana que viene', 'especial', Especial.NEXT_WEEK),
-        ('siguiente mes', 'especial', Especial.NEXT_MONTH),
-        ('proximo mes', 'especial', Especial.NEXT_MONTH),
-        ('mes que viene', 'especial', Especial.NEXT_MONTH),
-        ('siguiente cuatrimestre', 'especial', Especial.NEXT_QUARTER),
-        ('proximo cuatrimestre', 'especial', Especial.NEXT_QUARTER),
-        ('siguiente ano', 'especial', Especial.NEXT_YEAR),
-        ('proximo ano', 'especial', Especial.NEXT_YEAR),
-        ('ano que viene', 'especial', Especial.NEXT_YEAR),
-        ('temprano', 'hour', 8),
-        ('a la manana', 'hour', 8),
-        ('por la manana', 'hour', 8),
-        ('a la tarde', 'hour', 16),
-        ('por la tarde', 'hour', 16),
-        ('mediodia', 'hour', 12),
-        ('noche', 'hour', 20),
-        ('medianoche', 'hour', 0),
-        ('siesta', 'hour', 13),
-        ('lunes', 'weekday', 0),
-        ('martes', 'weekday', 1),
-        ('miercoles', 'weekday', 2),
-        ('jueves', 'weekday', 3),
-        ('viernes', 'weekday', 4),
-        ('sabado', 'weekday', 5),
-        ('domingo', 'weekday', 6),
-        ('enero', 'month', 1),
-        ('febrero', 'month', 2),
-        ('marzo', 'month', 3),
-        ('abril', 'month', 4),
-        ('mayo', 'month', 5),
-        ('junio', 'month', 6),
-        ('julio', 'month', 7),
-        ('agosto', 'month', 8),
-        ('septiembre', 'month', 9),
-        ('octubre', 'month', 10),
-        ('noviembre', 'month', 11),
-        ('diciembre', 'month', 12),
-        ('siguiente mes', 'months', 1),
-        ('siguiente año', 'years', 1),
-        ('proximo mes', 'months', 1),
-        ('proximo ano', 'years', 1),
-        ('ct', 'timezone', 'America/Chicago'),
-        ('cst', 'timezone', 'America/Chicago'),
-        ('central', 'timezone', 'America/Chicago'),
-        ('en', 'in', ''),
-        ('dentro de', 'in', ''),
-        ('dias', 'relative', 'days'),
-        ('semanas', 'relative', 'weeks'),
-        ('meses', 'relative', 'months'),
-        ('anos', 'relative', 'years'),
-        ('horas', 'relative', 'hours'),
-        ('minutos', 'relative', 'minutes'),
-        ('quincenas', 'relative', 'fortnights'),
-        ('trimestres', 'relative', 'quarters'),
-    ],
-    'es-articles': [
-        ('un', 'value', '1'),
-        ('una', 'value', '1'),
-    ],
-}
-
-# TODO: only works with one word phrases (doesn't find 'dentro de')
 def find_pos_in_glossary(phrase, kind, language="en"):
     glossary = GLOSSARY[language]
     phrase = phrase.split(" ")
-    kind_words = [word for word, kind_term, _ in glossary if kind == kind_term]
-    for i, word in enumerate(phrase):
-        if word in kind_words:
-            return i
+    kind_words = [x['target'] for x in glossary if x['type'] == kind]
+    for size in range(3, 0, -1):
+        formatted_phrase = []
+        for i in range(len(phrase) - size + 1):
+            formatted_phrase.append(' '.join(phrase[i:i+size]))
+        # stop looking at len(words) - size, so if there are 10 words you can only look up to 8th word for a 3 words prhase
+        for i, word in enumerate(formatted_phrase):
+            if word in kind_words:
+                return i
     return None
 
+'''Return the position of month and year in locale.
+
+This should be done with locale.nl_langinfo but isn't available on Windows.
+Args:
+    locale (string): locale
+Returns:
+    (int, int): position of month and year in locale
+'''
 def get_locale_monthdate(locale):
     lc.setlocale(lc.LC_ALL, locale)
     MONTH = 8
@@ -249,39 +146,84 @@ def can_be_minute(minute):
             return None
     return minute < 60
 
+''' Return the next weekday after the input date
 
+Args:
+    date (datetime): base date
+    weekday (int): 0 for Monday, 1 for Tuesday, ..., 6 for Sunday
+Returns:
+    datetime: next weekday after the input date
+'''
 def next_weekday(date, weekday):
     days_ahead = weekday - date.weekday()
     if days_ahead < 0: # Target day already happened this week
         days_ahead += 7
     return date + timedelta(days=days_ahead)
 
+''' Return a datetime in the future based on the input params.
 
+It's a mix between datetime() and relative delta that allows some flexibility, you can leave blank 
+parameters and there are some specials as quarters
+
+Args:
+    weekday (int): 0 for Monday, 1 for Tuesday, ..., 6 for Sunday
+
+    hour (int): hour of the day (0-23)
+    year (int): year
+    month (int): month of the year (1-12)
+    quarter (int): 1 for first quarter, 2 for second quarter, 3 for third quarter, 4 for fourth quarter
+    
+    years (int): number of years in the future
+    quarters (int): number of quarters in the future
+    months (int): number of months in the future
+    weeks (int): number of weeks in the future
+    days (int): number of days in the future
+    hours (int): number of hours in the future
+    minutes (int): number of minutes in the future
+    seconds (int): number of seconds in the future
+
+    special (special): Special.LATER, Special.WEEKEND, Special.TONIGHT, Special.TOMORROW,
+        Special.NEXT_WEEK, Special.NEXT_MONTH, Special.NEXT_QUARTER, Special.NEXT_YEAR
+    base_date (datetime): base date to calculate the future date. It should be always blank so it
+        takes current datetime, but it is useful for testing
+    
+    locale_timezone (timezone): timezone of the base_date
+    timezone (timezone): timezone of the result
+Returns:
+    datetime: future datetime
+'''
 def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, months=0, 
     year=None, years=0, hour=None, hours=0, minute=None, minutes=0, second=None, seconds=0, 
-    quarter=None, timezone=None, especial=None, base_date=None, locale_timezone=None,
+    quarter=None, timezone=None, special=None, base_date=None, locale_timezone=None,
     quarters=0):
 
-    # if it is an especial day it doesn't consider any other information about date
+    # if it is a special day it doesn't consider any other information about date
     
     # if it has relative days, it doesn't consider any other information about date
 
-    # if it is not especial nor relative, calculation will be different depending on
+    # if it is not special nor relative, calculation will be different depending on
     # whether there is a weekday or not.
+    
+    # WEEKDAY: If there is only a weekday it looks for the next weekday, but if you have another date unit
+    # (day, month, year), you have to check the period when all conditions get satisfied
+    # i.e. if you ask for Monday 3rd January 2024, it returns 3rd January 2024 if it is Monday
+
+    # NO WEEKDAY: If there is no weekday, it looks for the first date that satisfies the conditions
     # The logic for the absent date parts depends on whether there is a greater date part
     # if there is a greater date part it is the first value
     # i.e. you have year but not day_number nor month, day_number and month are 1st of January
     # i.e. you have month but not day_number, day_number is 1st of that month
     # if there is not a greater date part is current value (base_date value)
-    # or the next one if current value of the lesser date parts is before
+    # or the next one if current value of the lesser date parts is before base_date
     # i.e. if it is 10th of January and you ask for 15th (without month or year), it is 15th of January
     # but if it is 20th of January and you ask for 15th it is 15th of February
     # idem for months and years, if it is July and you ask for October without year will be same year
     # but if you as for March will be March next year
 
+    # check if there is nothing to calculate, it returns None
     if (weekday is None and weeks == 0 and day_number is None and days == 0 and month is None and months == 0
             and year is None and years == 0 and hour is None and hours == 0 and minute is None and minutes == 0
-            and second is None and seconds == 0 and quarter is None and quarters == 0 and especial is None):
+            and second is None and seconds == 0 and quarter is None and quarters == 0 and special is None):
         
         return None 
 
@@ -296,51 +238,54 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
     base_month = base_date.month
     base_year = base_date.year
     
-    hour_was_none = hour is None
+    # if hour is not set in params it is 8 am (DEFAULT_HOUR)
     if hour is None:
-        hour = 8
+        hour = DEFAULT_HOUR
     if minute is None:
         minute = 0
     if second is None:
         second = 0
-
-    if especial is not None:
-        if especial == Especial.LATER:
+    
+    # if I have a special value I don't have to calculate anything else
+    if special is not None:
+        if special == LATER:
             return (base_date + timedelta(hours=HOURS_LATER)).replace(minute=0, second=0, microsecond=0)
-        elif especial == Especial.WEEKEND:
+        elif special == WEEKEND:
             # if it is weekend (Saturday or Sunday), add two days to current day so it is on a laborable day
             if base_date.day >= 5:
                 base_date = base_date + relativedelta(days=2)
             # calculate next Saturday
             result = next_weekday(base_date, 5)
             return result.replace(hour=hour, minute=minute, second=second, microsecond=0)
-        elif especial == Especial.TONIGHT:
+        elif special == TONIGHT:
             if base_date.hour < 20:
-                return base_date.replace(hour=20, minute=0, second=0, microsecond=0)
+                return base_date.replace(hour=TONIGHT_TIME, minute=0, second=0, microsecond=0)
             else:
                 return None
-        elif especial == Especial.TOMORROW:
+        elif special == TOMORROW:
             return (base_date + timedelta(days=1)).replace(hour=hour, minute=minute, second=second, microsecond=0)
-        elif especial == Especial.NEXT_WEEK:
+        elif special == NEXT_WEEK:
             # next Monday, if today is Monday next week Monday (today + 7 days)
             result = next_weekday(base_date, 0) if base_weekday > 0 else base_date + relativedelta(days=7)
             return result.replace(hour=hour, minute=minute, second=second, microsecond=0)
-        elif especial == Especial.NEXT_MONTH:
-            # this quarter start date + 3 months
+        elif special == NEXT_MONTH:
             result = base_date.replace(day=1) + relativedelta(months=1)
             return result.replace(hour=hour, minute=minute, second=second, microsecond=0)
-        elif especial == Especial.NEXT_QUARTER:
+        elif special == NEXT_QUARTER:
             # this quarter start date + 3 months
             result = base_date.replace(month=base_month // 3 * 3  + 1, day=1) + relativedelta(months=3)
             return result.replace(hour=hour, minute=minute, second=second, microsecond=0)
-        elif especial == Especial.NEXT_YEAR:
+        elif special == NEXT_YEAR:
             result = base_date.replace(month=1, day=1) + relativedelta(years=1)
             return result.replace(hour=hour, minute=minute, second=second, microsecond=0)
 
+    # if I have relative quarters I translate it to relative months (get start of this quarter and
+    # add quarters * 3)
     if quarters > 0:
         months = quarters * 3 - (base_month - 1) % 3
         day_number = 1
 
+    # calculate if there aren't any relative date part
     if years == 0 and months == 0 and days == 0 and hours == 0 and minutes == 0 and seconds == 0 and weeks == 0 and quarters == 0:
         
         if weekday is not None:
@@ -348,7 +293,9 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
             if day_number is None and month is None and year is None:
                 return next_weekday(base_date + relativedelta(days=1), weekday).replace(hour=hour, minute=minute, second=second, microsecond=0)
             
-            # day number, month and year. Check if it is the same weekday and if it is in the future
+            # if day number, month and year are present have to check if that date has the same weekday and if it is in the future
+            # i.e. 15th January 2024 is Monday, so if you ask for Monday 2024-01-15 it returns that day, but if you as for 
+            # Tuesday 2024-01-15 it returns None
             elif day_number is not None and month is not None and year is not None:
                 result = datetime(year, month, day_number, hour, minute, second, microsecond=0)
                 if result.weekday() == weekday and result > base_date:
@@ -356,7 +303,12 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
                 else:
                     return None
                 
-            # day number
+            # you have day number may be year, may be month, may be neither, but not both year and month
+            # i.e. Monday 3rd (get next 3rd that is on Monday)
+            # i.e. Monday 3rd January (get next 3rd January that is on Monday, for example 2022 or 2028)
+            # i.e. Monday 3rd 2024 (get next day 3rd in 2024 that is on Monday, first Monday 3rd in the year is June)
+
+            # you have to try advancing month by month or year by year until to you find a coincidence
             elif day_number is not None:
                 # initial month is base month or the month you input
                 start_month = base_month
@@ -368,7 +320,7 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
                     start_year = year
                 try_date = datetime(start_year, start_month, day_number, hour=hour, minute=minute, second=second)
 
-                # if the date is before the base date, it has to be the next month
+                # if the date is before the base date, it has to be the next month (or next year if month is not blank)
                 if try_date < base_date:
                     if month is None:
                         try_date = try_date + relativedelta(months=1)
@@ -449,25 +401,30 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
                 else:
                     # it is a weekday after last weekday on the year
                     return None
+        ### Here finished weekday is Not None ###
 
-        # if I don't have a day_number and I have a greater unit (month, year, quarter) I have to start on 1st day of that unit
-        # if I don't have a greater unit, I have to start on current day, or may be tomorrow if hour is before base_hour
-        
+        # ********* weekday is blank *************
+
         plus_day = 0
         plus_month = 0
         plus_year = 0
         day_was_none = day_number is None
+
+        # First I set day, which is in the params, or is base_date day or 1st day of month
+        # if I don't have a day_number and I have a greater unit (month, year, quarter) I have to start on 1st day of that unit
+        # if I don't have a greater unit, I have to start on current day, or may be tomorrow if hour is before base_hour
         if day_number is None:
             if month is not None or quarter is not None or year is not None:
                 day_number = 1
             else:
                 day_number = base_date.day
                 # if I add 1 day to day_number, it could be after last_day of month
-                # as last_day of month depends on the year (because of leap years)
-                # I make that check after setting month and year
+                # As last_day of month depends on the year (because of leap years)
+                # I check that after setting month and year
                 if hour is not None and hour <= base_date.hour:
                     plus_day = 1
         
+        # then I set month, which is in the params, or is base_date month or is 1st month of year or quarter
         # if I don't have a month and I have a year I have to start on first month of that year
         # if I don't have a month and I have a quarter, I have to calculate which is the first month of that quarter
         # if I don't have a month nor any greater unit it should be current month, except day_number
@@ -498,36 +455,41 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
         if month > 12:
             return None
         
-        # all of the next could be in a function that receives day, month and year and tries to 
-        # make them consistent (29th Feb no year in July 2024 -> 2028-02-29)
-        
+        # *** FIX MONTH ****
+        # if after adding a month new month is 13 or more, I have to calculate modulo between new month and 12
+        # and add years as the integer part between new month divided by 12
+        # i.e. month = 11 + plus_month=4, new_month = (11 + 4) % 12 = 3, plus_year = 1
+
         # as month is 1-based instead of 0-based I have to convert it to 0-based (substract 1) and then back to 1-based (add 1)
         # so I can use the modulo properly
         new_month = (month - 1 + plus_month) % 12 + 1
         # as month is 1-based instead of 0-based I have to convert it to 0-based (substract 1) to use // 12 properly to get years to add
         new_year = year + plus_year + (month - 1 + plus_month) // 12
 
-        first_day_temp = datetime(new_year, new_month, 1)
+        
+        # *** FIX DAY ***
 
         # if my new date is 29, 30 or 31 in a month that doesn't have that day, or it is the last day of the month and hour is before base_hour 
-        # I have to add: a month if month was none, or a day if month was present. I have to do it up to date is consistent
+        # I have to add: a month if month was none, or a day if month was present, or a year if month and day are present.
+        # I have to do it up to date is consistent
         # This could be the case when you ask for a 29 Feb in Jun 2024, it will add a year until it gets year 2028
-        # or if you are on 31st August 7 pm and you ask for 31st 5 pm, it will add a month and will get September 31
-        # so it has to add another month in order to get October 31
-
+        # or if you are on 31st August 7 pm and you ask for 31st 5 pm, it will add a month and will get September 31st
+        # so it has to add another month in order to get October 31st
+        
+        first_day_temp = datetime(new_year, new_month, 1)
         max_day = calendar.monthrange(first_day_temp.year, first_day_temp.month)[1]
             
         if max_day < day_number or (max_day == day_number and datetime(year, month, day_number, hour, minute, second) <= base_date):
             while True:
                 # if day, nor month nor year are present then you add a day
-                # I think this case is never used
+                # (I think this case is never used)
                 # Example: 6 pm and now is 8 pm, you have to add a day
                 if day_was_none and month_was_none and year_was_none:
                     plus_day = plus_day + 1
                     first_day_temp = first_day_temp + relativedelta(days=1)    
                     max_day = calendar.monthrange(first_day_temp.year, first_day_temp.month)[1]
                 # if month is not present you can add a month
-                # Example: 30th of June and you ask for 31st, you have to add a month to get August
+                # Example: 30th of June and you ask for 31st, you have to add a month to get July
                 # Example: 31st August 8 pm and you ask for 31st 10 am, you have to add a monther to see if next month has 31
                 # Example: 31st December 8 pm and you ask for 31st 10 am, you have to add a month to see if next month (January next year) has 31
                 elif month_was_none:
@@ -548,22 +510,6 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
         year = year + plus_year + (month - 1 + plus_month) // 12
         month = (month - 1 + plus_month) % 12 + 1
 
-
-    #     # print(year, month, day_number)
-    #     last_month_day = calendar.monthrange(year, month)[1]
-    #     # this could be because you asked for 31st on a 30 days month (only day_number is present)
-    #     # or if only hour is present but not day_number because you are in an hour after your base_hour so it adds a day
-    #     # to the last day of a month (31, 30, 29 or 28, it depends on the month and the year)
-    #     # solution is always getting the next month because there aren't two consecutives months with less than 31 days
-
-    #     if day_number > last_month_day:
-    #         month = month % 12 + 1
-    #         # if day was present, you have to keep that day_number (and so you add a month)
-    #         # if day was empty, your day_number move to the first day in next month
-    #         if month == 1:
-    #             year = year + 1
-    #         if day_was_none:
-    #             day_number = 1
 
     if year is None:
         year = base_year
@@ -587,7 +533,17 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
     else:
         return None
     
+''' Try to convert a natural language text into a datetime.
 
+Args:
+    text: text to parse
+    language: language of the text
+    base_date: base date to calculate the future date. It should be always blank so it takes current datetime, but it is useful for testing
+    locale_timezone: timezone of the base_date
+    locale: locale of the base_date
+Returns:
+    datetime: future datetime or None if it can't parse
+'''
 def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_US"):
     if base_date is None:
         base_date = datetime.now()
@@ -610,7 +566,7 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
     weeks = 0
     quarters = 0
 
-    especial = None
+    special = None
     year = None
     month = None
     day_number = None
@@ -619,40 +575,35 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
     minute = None
     second = None
     quarter = None
-    relative = False
 
     ### FIND RELATIVE ###
     start = find_pos_in_glossary(text, 'in', language)
-    # I found an "in" word
 
-    glossary = GLOSSARY[language]
-
-    indefinite_articles = [(word, result) for word, kind_term, result in GLOSSARY[language + '-articles']]
-
+    # if there is an "in" phrase, it has to be a relative date, it only looks for possible relative phrase
+    # with two periods max (i.e. "in 2 days and 3 hours" but not "in a month, 2 days and 3 hours")
     if start is not None:
         #in_phrase is the maximum length for an in phrase (i.e. "in 2 days and an hour", 6 words)
         
-        # replace "a" and "an" with 1
-        for i, word in enumerate(words):
-            for lookedupword, result in indefinite_articles:
-                # print("lookedupword, word, start, i: ", lookedupword, word, start, i)
-                if lookedupword == word and i >= start and i <= start + 6:
-                    words[i] = result    
-
         in_phrase = words[start: start+6]
-
-        # print("in phrase", in_phrase)
-        relative_words = [(word, result) for word, kind_term, result in glossary if 'relative' == kind_term]
-        # print("relative_words", relative_words)
-        relatives = {}
+        # replace "a" and "an" with 1
+        # replace "one" with 1, "two" with 2 ... "fifteen" with 15
         for i, word in enumerate(in_phrase):
-            for lookedupword, result in relative_words:
-                if lookedupword.startswith(word):
-                    relatives[result] = in_phrase[i-1]
-                    break
-        # print("relatives", relatives)
-        hours = int(relatives['hours']) if 'hours' in relatives else 0
+            result = words_to_datepart(word, language, filter=["number"])
+            if result is not None:
+                in_phrase[i] = str(result['value'])
 
+        
+        relatives = {}
+        
+        # tries to find relative period words and assign previous word as value
+        # i.e. "in 2 days and 3 hours" -> {'days': 2, 'hours': 3}
+        for i, word in enumerate(in_phrase):
+            result = words_to_datepart(word, language, filter=["relative"])
+            if result is not None:
+                relatives[result['value']] = in_phrase[i-1]
+
+        # after getting relative values it assigns them to the corresponding variable
+        hours = int(relatives['hours']) if 'hours' in relatives else 0
         minutes = int(relatives['minutes']) if 'minutes' in relatives else 0
         years = int(relatives['years']) if 'years' in relatives else 0
         months = int(relatives['months']) if 'months' in relatives else 0
@@ -672,6 +623,9 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
 
 
         #### FIND WORDS ######
+        # find words that are in the glossary and assign them to the corresponding variable
+        # i.e. january -> month = 1, afternoon -> hour = 15
+
         # start looking for 3 words phrases, then 2 words phrases and finally 1 word
         for size in range(3, 0, -1):
             # stop looking at len(words) - size, so if there are 10 words you can only look up to 8th word for a 3 words prhase
@@ -698,64 +652,64 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
             # remove empty words (erased words because they are part of a phrase)
             words[:] =  (value for value in words if value != None)
         
-        # print(results)
         for r in results:
-            if r[1] == 'especial':
-                if especial is None:
-                    especial = r[2]
+            if r['type'] == 'special':
+                if special is None:
+                    special = r['value']
                 else:
                     return None
-            elif r[1] == 'days':
+            elif r['type'] == DAYS:
                 if days == 0:
-                    days = r[2]
+                    days = r['value']
                 else:
                     return None
-            elif r[1] == 'weekday':
-                weekday = r[2]
-            elif r[1] == 'month':
-                month = r[2]
-            elif r[1] == 'quarter':
-                quarter = r[2]
-            elif r[1] == 'weeks':
-                weeks = r[2]
+            elif r['type'] == WEEKDAY:
+                weekday = r['value']
+            elif r['type'] == MONTH:
+                month = r['value']
+            elif r['type'] == QUARTER:
+                quarter = r['value']
+            elif r['type'] == WEEKS:
+                weeks = r['value']
                 weekday = 0
                 hour = 8
                 minute = 0
                 second = 0
-            elif r[1] == 'months':
-                months = r[2]
+            elif r['type'] == MONTHS:
+                months = r['value']
                 day_number = 1
                 hour = 8
                 minute = 0
                 second = 0
-            elif r[1] == 'years':
-                years = r[2]
+            elif r['type'] == YEARS:
+                years = r['value']
                 month = 1
                 day_number = 1
                 hour = 8
                 minute = 0
                 second = 0
-            elif r[1] == 'hour':
-                hour = r[2]
-            elif r[1] == 'timezone':
-                timezone = pytz.timezone(r[2])
-            elif r[1] == 'in':
-                relative = True
+            elif r['type'] == HOUR:
+                hour = r['value']
+            elif r['type'] == TIMEZONE:
+                timezone = pytz.timezone(r['value'])
 
-        if relative:
-            items = [GLOSSARY[language][words.index(x)] for x in words if x.startswith(text)]
         # check if am or pm is separated from the time. If it is, join them
         for i in range(1, len(words)):
-            if words[i] in ['am', 'pm', 'a.m.', 'p.m.']:
+            if words[i] in AM_PM:
                 words[i-1] = words[i-1] + words[i]
                 words[i] = None
             
         # remove empty words (erased am/pm)
         words[:] =  (value for value in words if value != None)
+
+        ##### FIND DATE PARTS THAT HAVE NUMBER IN THEM #####
+        # i.e. 1st, 3rd, 5th for day, time separated by colon, dates separated by slashes or dashes
+        # time in military format or quarter like q1, q2, q3, q4
         for pos, word in enumerate(words):
 
             #### FIND DAY WITH ORDINALS ######    
-            if word[0].isdigit() and word[-2:] in ['st', 'nd', 'rd', 'th']:
+            # 1st = day 1, 5th = day 5, 31st = day 31
+            if word[0].isdigit() and word[-2:] in ORDINALS:
                 number = word[:-2]
                 try:
                     day_number = int(number)
@@ -764,31 +718,24 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                     return None
             
             #### FIND HOUR with semicolon, am or pm ######
-            if ':' in word and word[-1] not in['.', 'm']:
-                word = word + 'am'
+            # 1:00 = 1 am, 1:14pm = 13:15, 1:00a.m. = 1 am, 1:00p.m. = 1 pm
 
-            if word[-2:] in ['am', 'pm'] or word[-4:] in ['a.m.', 'p.m.']:
-                pm = False
-                if 'p' in word:
-                    pm = True
-                word = word[:-2]
-                if word[-1] == '.':
-                    word = word[:-2]
-                
-                time = word.split(":")
-                hour = int(time[0])
-                
-                hour = hour + 12 if pm and hour < 12 else hour
-                minute = 0
-                second = 0
-                if len(time) > 1:
-                    minute = int(time[1])
-                if len(time) > 2:
-                    second = int(time[2])
-                continue
+            # if we don't have am or pm, we guess it is am
+            # TODO: probably a better way to do this with a function
+            # that converts a.m. or am in am and p.m. or pm in pm
+            # and get the hour
+            new_hour, new_minute, new_second = get_time(word)
+
+            if new_hour is not None:
+                hour = new_hour
+            if new_minute is not None:
+                minute = new_minute
+            if new_second is not None:
+                second = new_second
             
             #### FIND YEAR ######
-            # print(word)
+            # uses can_be_year function (if word is 4 digits and is between this year and this year + 10)
+            # 2024 = year 2024
             if len(word) == 4 and word.isdigit():
                 maybe_year = int(word)
                 if can_be_year(maybe_year, base_date):
@@ -796,6 +743,7 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                     continue
 
             #### FIND HOUR MILITARY FORMAT #####
+            # 0830 = 08:30, 1600 = 16:00
             if len(word) == 4 and word.isdigit():
                 hour = int(word[:2])
                 minute = int(word[2:])
@@ -804,6 +752,7 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                 continue
 
             #### FIND QUARTER ######
+            # if starts with "q" and then a number between 1 and 4
             if word[0] == 'q' and word[1:].isdigit():
                 quarter = int(word[1:])
                 if quarter > 4 or quarter < 1:
@@ -812,14 +761,10 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                 
             #### FIND DATE SEPARATED BY DASH OR SLASH ######
             separator = None
-            if '-' in word:
-                separator = '-'
-            elif '/' in word:
-                separator = '/'
-            elif '\\' in word:
-                separator = '\\'
-            elif '–' in word:
-                separator = '–'
+            for char in word:
+                if char in SEPARATORS:
+                    separator = char
+                    break
             
             # print(separator)
             if separator is not None:
@@ -943,7 +888,7 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                     if month.isdigit():
                         month = int(month)
                     else:
-                        month = words_to_datepart(month, language=language)[2]
+                        month = words_to_datepart(month, language=language)['value']
                 
                 day_number = int(date_array[day_is_in]) if day_is_in is not None else None
                 continue
@@ -967,7 +912,7 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                         day_number = number
                         continue
                 
-                # year as 4 digits was already treated, so 2 digits is onlye possibility
+                # year as 4 digits was already treated, so 2 digits is only possibility
                 # 2 digit year only makes sense if you have month and month is before year, 
                 #   i.e "06 24" (June 2024) but not "24 06" nor "35 06" (24 and 35 can't represent year)
                 # day_number + year is nos natural i.e. "15 24"
@@ -993,31 +938,50 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                     continue
 
 
-    # print(f"calling future: base_date {str(base_date)} especial {especial}\n year {year} quarter {quarter} month {month} day_number {day_number} hour {hour} minute {minute} \ntimezone {timezone} locale_timezone {locale_timezone} \nyears {years} quarters {quarters} months {months} weeks {weeks} days {days} hours {hours} minutes {minutes}")
-    return future_datetime(base_date=base_date, especial=especial, days=days, weekday=weekday, 
+    # print(f"calling future: base_date {str(base_date)} special {special}\n year {year} quarter {quarter} month {month} day_number {day_number} hour {hour} minute {minute} \ntimezone {timezone} locale_timezone {locale_timezone} \nyears {years} quarters {quarters} months {months} weeks {weeks} days {days} hours {hours} minutes {minutes}")
+    return future_datetime(base_date=base_date, special=special, days=days, weekday=weekday, 
         day_number=day_number, month=month, year=year, hour=hour, minute=minute, second=second,
         weeks=weeks, years=years, months=months, quarter=quarter, timezone=timezone, 
         hours=hours, minutes=minutes, quarters=quarters, locale_timezone=locale_timezone)
     
+'''It looks for a phrase or word into the glossary and returns the correspoding tuple (word, type, value)
 
-def words_to_datepart(text, language='en'):
-    words = [x[0] for x in GLOSSARY[language]]
-    items = [GLOSSARY[language][words.index(x)] for x in words if x.startswith(text)]
-
+TODO: it has to return an object instead of a dict
+Args:
+    text (string): text to search into glossary
+    language (string): language of the text
+    filter (list): list of types to filter the search
+Returns:
+    (word, type, value): tuple with the word, type and value of the word
+'''
+def words_to_datepart(text, language='en', filter=None):
+    glossary = GLOSSARY[language]
+    if filter is not None:
+        glossary = [x for x in glossary if x['type'] in filter]
+    words = [x['target'] for x in glossary]
+    items = [glossary[words.index(x)] for x in words if x.startswith(text)]
     # first ask if input text is exactly like one of the words in the glossary (word is first element of tuple of glossaries)
     if text in words:
-        return GLOSSARY[language][words.index(text)]
-    # then ask if there is at least one word that starts with input text
-    elif len([x for x in words if x.startswith(text)]) >= 1:
+        return glossary[words.index(text)]
+    
+    # then ask if there is at least one word that starts with input text (if text is at least 3 characters long)
+    elif len([x for x in words if x.startswith(text) and len(text) >= 3]) >= 1:
         # get all of the words that start with input text
-        items = [GLOSSARY[language][words.index(x)] for x in words if x.startswith(text)]
+        items = [glossary[words.index(x)] for x in words if x.startswith(text)]
 
         # slice items to remove the word and make a set of it, so if there are two or more words that start with input text
         # and the result of those words is the same (i.e. they mean the same concept), it returns the first one
         # EXAMPLE: tomor for tomorrow and tomorow
-        if len(set([x[1:] for x in items])) == 1:
+        if len(set([x['value'] for x in items])) == 1:
             return items[0]
 
+'''It looks for a word or phrase into the list of timezones and returns the correspoding timezone
+
+Args:
+    text (string): text to search into the list of timezones in pytz library
+Returns:
+    timezone: timezone object
+'''
 def get_timezone(text):
     #at least 3 characterse, if not returns 2
     if text is not None and len(text) >= 3:
@@ -1029,6 +993,38 @@ def get_timezone(text):
             return timezones[0]
         
     return None
+
+def get_time(word):
+    hour = None
+    minute = None
+    second = None
+
+    # find colon or am/pm in the word
+    if ':' in word or any(x in word for x in AM_PM):
+        time = word.split(":")
+        am_pm = None
+        for i, char in enumerate(word):
+            if char.isalpha():
+                time = [x for x in word[:i].split(":")]
+                am_pm = word[i:]
+                break
+        
+        time = [int(x) for x in time if x.isdigit()]
+        # if we have pm, we add 12 to the hour
+        pm = False
+        if am_pm is not None and 'p' in am_pm:
+            pm = True
+        
+        if len(time) == 1:
+            hour = time[0]
+        elif len(time) == 2:
+            hour, minute = time
+        elif len(time) == 3:
+            hour, minute, second = time
+        
+        hour = hour + 12 if pm and hour < 12 else hour
+    return hour, minute, second
+
 
 def suggest(text, language='en', base_date=None, locale_timezone=None, locale="en_US", max_suggestions=4):
     if base_date is None:
@@ -1080,4 +1076,4 @@ def suggest(text, language='en', base_date=None, locale_timezone=None, locale="e
         print(x[0], x[1].strftime("%Y-%m-%d %H:%M:%S %Z%z"))
     
 
-suggest("33", locale_timezone=pytz.timezone('America/Buenos_Aires'))
+# suggest("33", locale_timezone=pytz.timezone('America/Buenos_Aires'))
