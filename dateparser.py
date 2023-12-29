@@ -18,7 +18,6 @@ If you write "01-06" it suggests June 1st or January 6th depending on your langu
 MAKE LOT OF TESTS
 '''
 import calendar
-from enum import Enum
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import pytz
@@ -26,10 +25,10 @@ import locale as lc
 import json
 
 import unicodedata
-import sys
+import re
 
 
-LATER = 'LATER'
+TODAY = 'TODAY'
 WEEKEND = 'WEEKEND'
 TONIGHT = 'TONIGHT'
 TOMORROW = 'TOMORROW'
@@ -37,11 +36,14 @@ NEXT_WEEK = 'NEXT_WEEK'
 NEXT_MONTH = 'NEXT_MONTH'
 NEXT_QUARTER = 'NEXT_QUARTER'
 NEXT_YEAR = 'NEXT_YEAR'
+LATER_TONIGHT = 'LATER_TONIGHT'
 
-DEFAULT_HOUR = 8
+DEFAULT_HOUR = 9
 TONIGHT_TIME = 20
+END_OF_DAY_TIME = 17
 
 DAYS = 'days'
+DAY = 'day'
 WEEKDAY = 'weekday'
 MONTH = 'month'
 QUARTER = 'quarter'
@@ -49,10 +51,18 @@ WEEKS = 'weeks'
 MONTHS = 'months'
 YEARS =  'years'
 HOUR = 'hour'
+HOURS = 'hours'
+# next X hours but minute = 0
+HOURS_NO_MIN = 'hours-no-min'
 TIMEZONE = 'timezone'
-AM_PM = ['am', 'pm', 'a.m.', 'p.m.', 'a.m', 'p.m', 'am.', 'pm.']
+AM_PM = ['am', 'pm', 'a.m.', 'p.m.', 'a.m', 'p.m', 'am.', 'pm.', 'a', 'p']
 ORDINALS = ['st', 'nd', 'rd', 'th']
 SEPARATORS = ['/', '-', '\\', '–']
+
+# TODO: 2 hours // 30 minutes (or mins)
+# TODO: 2h // 30m 
+# TODO: 1 wk or 1 week
+# TODO: 2 mo
 
 with open("glossary.json", "r") as read_file:
     GLOSSARY = json.load(open("glossary.json", "r"))
@@ -67,7 +77,7 @@ def normalize(input_str):
 def find_pos_in_glossary(phrase, kind, language="en"):
     glossary = GLOSSARY[language]
     phrase = phrase.split(" ")
-    kind_words = [x['target'] for x in glossary if x['type'] == kind]
+    kind_words = [x['target'] for x in glossary if kind in [y['type'] for y in x['result']]]
     for size in range(3, 0, -1):
         formatted_phrase = []
         for i in range(len(phrase) - size + 1):
@@ -76,6 +86,16 @@ def find_pos_in_glossary(phrase, kind, language="en"):
         for i, word in enumerate(formatted_phrase):
             if word in kind_words:
                 return i
+    return None
+
+def find_exact_in_glossary(text, kind, language="en"):
+    words = text.split(" ")
+    glossary = GLOSSARY[language]
+    kind_words = [x['target'] for x in glossary if kind in [y['type'] for y in x['result']]]
+    for pos, word in enumerate(words):
+        if word in kind_words:
+            return pos
+    
     return None
 
 '''Return the position of month and year in locale.
@@ -145,6 +165,8 @@ def can_be_minute(minute):
         else:
             return None
     return minute < 60
+
+
 
 ''' Return the next weekday after the input date
 
@@ -238,7 +260,8 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
     base_month = base_date.month
     base_year = base_date.year
     
-    # if hour is not set in params it is 8 am (DEFAULT_HOUR)
+    # if hour is not set in params it is 9 am (DEFAULT_HOUR)
+    hour_was_none = hour is None
     if hour is None:
         hour = DEFAULT_HOUR
     if minute is None:
@@ -248,8 +271,21 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
     
     # if I have a special value I don't have to calculate anything else
     if special is not None:
-        if special == LATER:
-            return (base_date + timedelta(hours=HOURS_LATER)).replace(minute=0, second=0, microsecond=0)
+        
+        if special == TODAY:
+            minute = 0
+            second = 0
+            if hour_was_none:
+                if base_date.hour < 12:
+                    hour = 12
+                elif base_date.hour < 17:
+                    hour = 17
+                elif base_date.hour < 21:
+                    hour = 21
+                else:
+                    hour = 23
+                    minute = 59
+            return (base_date.replace(minute=0, second=0, microsecond=0)).replace(hour=hour, minute=minute, second=0, microsecond=0)
         elif special == WEEKEND:
             # if it is weekend (Saturday or Sunday), add two days to current day so it is on a laborable day
             if base_date.day >= 5:
@@ -262,6 +298,12 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
                 return base_date.replace(hour=TONIGHT_TIME, minute=0, second=0, microsecond=0)
             else:
                 return None
+        elif special == LATER_TONIGHT:
+
+            if base_date.hour < TONIGHT_TIME - HOURS_LATER:
+                return base_date.replace(hour=TONIGHT_TIME, minute=0, second=0, microsecond=0)
+            else:
+                return (base_date + relativedelta(hours=HOURS_LATER)).replace(minute=0, second=0)
         elif special == TOMORROW:
             return (base_date + timedelta(days=1)).replace(hour=hour, minute=minute, second=second, microsecond=0)
         elif special == NEXT_WEEK:
@@ -285,7 +327,7 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
         months = quarters * 3 - (base_month - 1) % 3
         day_number = 1
 
-    # calculate if there aren't any relative date part
+    # calculate if there isn't any relative date part
     if years == 0 and months == 0 and days == 0 and hours == 0 and minutes == 0 and seconds == 0 and weeks == 0 and quarters == 0:
         
         if weekday is not None:
@@ -510,7 +552,7 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
         year = year + plus_year + (month - 1 + plus_month) // 12
         month = (month - 1 + plus_month) % 12 + 1
 
-
+    # print("hours", hours, "hour", hour, "minutes", minutes, "minute", minute, "seconds", seconds, "second", second)
     if year is None:
         year = base_year
     if month is None:
@@ -527,7 +569,6 @@ def future_datetime(weekday=None, weeks=0, day_number=None, days=0, month=None, 
     # print(year, month, day_number, hour, minute, second, years, months, days, weeks, hours, minutes, seconds)
     result = datetime(year, month, day_number, hour, minute, second, microsecond=0, tzinfo=timezone) + relativedelta(years=years, 
         months=months, days=days, weeks=weeks, hours=hours, minutes=minutes, seconds=seconds)
-    
     if  result > base_date:
         return result
     else:
@@ -576,21 +617,55 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
     second = None
     quarter = None
 
-    ### FIND RELATIVE ###
-    start = find_pos_in_glossary(text, 'in', language)
+    #### FIND NUMBERS AND LETTERS (1w, 2mo, 3d, 4h, 5m, 6mins) ######
+    # replace with number and word for easier parsing
+    for i, word in enumerate(words):
+        if word[0].isdigit() and word[-1].isalpha() and not word.endswith(tuple(AM_PM)):
+            last_digit = 0
+            for i in reversed(range(len(word))):
+                if word[i].isdigit():
+                    last_digit = i
+                    break
+            
+            number = int(word[:last_digit+1])
+            letters = word[last_digit+1:]
+            
+            relative_word = words_to_datepart(letters, language, filter=["relative"])
+            
+            if relative_word is not None:
+                new_word = str(number) + ' ' + relative_word['result'][0]['value']
+                text = re.sub(r'\b' + word + r'\b', new_word, text)
+                words = text.split(" ")
 
-    # if there is an "in" phrase, it has to be a relative date, it only looks for possible relative phrase
+    
+    ### FIND RELATIVE ###
+    # first occurrence of "in" word
+    start = find_pos_in_glossary(text, 'in', language)
+    
+    # first occurence of relative word
+    if start is None:
+        first_relative = find_exact_in_glossary(text, 'relative', language)
+        
+        # first relative minus one because number is before the first relative word
+        if first_relative is not None:
+            first_relative = first_relative - 1
+            first_word = words[first_relative]
+            if words_to_datepart(first_word, language, filter=["number"]) is not None or first_word.isdigit():
+                start = first_relative
+    
+    # if there is an "in" phrase or a relative word, it has to be a relative date, it only looks for possible relative phrase
     # with two periods max (i.e. "in 2 days and 3 hours" but not "in a month, 2 days and 3 hours")
     if start is not None:
         #in_phrase is the maximum length for an in phrase (i.e. "in 2 days and an hour", 6 words)
         
         in_phrase = words[start: start+6]
+        
         # replace "a" and "an" with 1
         # replace "one" with 1, "two" with 2 ... "fifteen" with 15
         for i, word in enumerate(in_phrase):
             result = words_to_datepart(word, language, filter=["number"])
             if result is not None:
-                in_phrase[i] = str(result['value'])
+                in_phrase[i] = str(result['result'][0]['value'])
 
         
         relatives = {}
@@ -600,8 +675,8 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
         for i, word in enumerate(in_phrase):
             result = words_to_datepart(word, language, filter=["relative"])
             if result is not None:
-                relatives[result['value']] = in_phrase[i-1]
-
+                relatives[result['result'][0]['value']] = in_phrase[i-1]
+        
         # after getting relative values it assigns them to the corresponding variable
         hours = int(relatives['hours']) if 'hours' in relatives else 0
         minutes = int(relatives['minutes']) if 'minutes' in relatives else 0
@@ -613,11 +688,11 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
         weeks = int(relatives['fortnights']) * 2 if 'fortnights' in relatives else weeks
 
         if hours == 0 and minutes == 0:
-            hour = 8
+            hour = DEFAULT_HOUR
         else:
             hour = base_date.hour
-            if minutes > 0:
-                minute = base_date.minute
+            # if minutes > 0:
+            minute = base_date.minute
     
     else:
 
@@ -636,8 +711,10 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                 if words[i] is not None:
                     # print(words[i:i+size])
                     result = words_to_datepart(word, language)
+                    
                     if result is not None:
-                        results.append(result)
+                        for x in result['result']:
+                            results.append(x)
                         # set words to None so they aren't considered again
                         words[i:i+size] = [None] * size
                     else:
@@ -665,6 +742,8 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                     return None
             elif r['type'] == WEEKDAY:
                 weekday = r['value']
+            elif r['type'] == DAY:
+                day_number = r['value']
             elif r['type'] == MONTH:
                 month = r['value']
             elif r['type'] == QUARTER:
@@ -672,24 +751,34 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
             elif r['type'] == WEEKS:
                 weeks = r['value']
                 weekday = 0
-                hour = 8
+                hour = DEFAULT_HOUR
                 minute = 0
                 second = 0
             elif r['type'] == MONTHS:
                 months = r['value']
                 day_number = 1
-                hour = 8
+                hour = DEFAULT_HOUR
                 minute = 0
                 second = 0
             elif r['type'] == YEARS:
                 years = r['value']
                 month = 1
                 day_number = 1
-                hour = 8
+                hour = DEFAULT_HOUR
                 minute = 0
                 second = 0
             elif r['type'] == HOUR:
-                hour = r['value']
+                hour = r['value']            
+            elif r['type'] == HOURS:
+                hours = r['value']
+                hour = base_date.hour
+                minute = base_date.minute
+                second = base_date.second
+            elif r['type'] == HOURS_NO_MIN:
+                hours = r['value']
+                hour = base_date.hour
+                minute = 0
+                second = 0
             elif r['type'] == TIMEZONE:
                 timezone = pytz.timezone(r['value'])
 
@@ -721,9 +810,6 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
             # 1:00 = 1 am, 1:14pm = 13:15, 1:00a.m. = 1 am, 1:00p.m. = 1 pm
 
             # if we don't have am or pm, we guess it is am
-            # TODO: probably a better way to do this with a function
-            # that converts a.m. or am in am and p.m. or pm in pm
-            # and get the hour
             new_hour, new_minute, new_second = get_time(word)
 
             if new_hour is not None:
@@ -751,6 +837,11 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                     return None
                 continue
 
+            # #### FIND TIME BEFORE 12 WITHOUT AM/PM #####
+            # if word.isdigit() and int(word) < 13:
+            #     hour = int(word)
+            #     continue
+
             #### FIND QUARTER ######
             # if starts with "q" and then a number between 1 and 4
             if word[0] == 'q' and word[1:].isdigit():
@@ -758,7 +849,8 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                 if quarter > 4 or quarter < 1:
                     return None
                 continue
-                
+        
+
             #### FIND DATE SEPARATED BY DASH OR SLASH ######
             separator = None
             for char in word:
@@ -845,7 +937,6 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                     # 2. Three-parts date: in that case I have to check locale format
                     
                     else:
-                        # returns a tuple where first element is month position and second is day position, i.e. in US is (0,1) in UK is (1,0)
                         
                         if len(date_array) == 2:
                             can_have_month = date_array[0].isdigit() and (can_be_month(date_array[0]) or can_be_month(date_array[1]))
@@ -888,7 +979,7 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                     if month.isdigit():
                         month = int(month)
                     else:
-                        month = words_to_datepart(month, language=language)['value']
+                        month = words_to_datepart(month, language=language, filter=["month"])['result'][0]['value']
                 
                 day_number = int(date_array[day_is_in]) if day_is_in is not None else None
                 continue
@@ -896,21 +987,24 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
             ###### FIND JUST NUMBERS THAT COULD BE DAY, MONTH, YEAR, HOUR OR MINUTE ######
             if word.isdigit():
                 number = int(word)
-                if month_pos == 0:
-                    if month is None and can_be_month(number):
-                        month = number
-                        continue
-                elif day_number is None and can_be_day(number):
-                        day_number = number
-                        continue
-                    
-                if month_pos == 1:
-                    if month is None and can_be_month(number):
-                        month = number
-                        continue
-                elif day_number is None and can_be_day(number):
-                        day_number = number
-                        continue
+                
+                if  pos < len(words) - 1 and words[pos+1].isdigit():
+                    if month_pos == 0:
+                        if month is None and can_be_month(number):
+                            month = number
+                            continue
+                    elif day_number is None and can_be_day(number):
+                            day_number = number
+                            continue
+                
+                if words[pos-1].isdigit():
+                    if month_pos == 1:
+                        if month is None and can_be_month(number):
+                            month = number
+                            continue
+                    elif day_number is None and can_be_day(number):
+                            day_number = number
+                            continue
                 
                 # year as 4 digits was already treated, so 2 digits is only possibility
                 # 2 digit year only makes sense if you have month and month is before year, 
@@ -921,7 +1015,11 @@ def parse(text, language='en', base_date=None, locale_timezone=None, locale="en_
                     year = number + 2000
                     continue
                 if hour is None and can_be_hour(number):
-                    hour = number
+                    if number < 12:
+                        if base_date.hour < number:
+                            hour = number
+                        else:
+                            hour = number + 12
                     continue
                 if minute is None and can_be_minute(number):
                     # if hour is nothing but previous is day_number, previous represents hour not day_number
@@ -957,10 +1055,12 @@ Returns:
 def words_to_datepart(text, language='en', filter=None):
     glossary = GLOSSARY[language]
     if filter is not None:
-        glossary = [x for x in glossary if x['type'] in filter]
+        # kind_words = [x['target'] for x in glossary if kind in [y['type'] for y in x['result']]]
+        glossary = [x for x in glossary if any(r['type'] in filter for r in x['result'])]
     words = [x['target'] for x in glossary]
     items = [glossary[words.index(x)] for x in words if x.startswith(text)]
     # first ask if input text is exactly like one of the words in the glossary (word is first element of tuple of glossaries)
+    
     if text in words:
         return glossary[words.index(text)]
     
@@ -972,8 +1072,10 @@ def words_to_datepart(text, language='en', filter=None):
         # slice items to remove the word and make a set of it, so if there are two or more words that start with input text
         # and the result of those words is the same (i.e. they mean the same concept), it returns the first one
         # EXAMPLE: tomor for tomorrow and tomorow
-        if len(set([x['value'] for x in items])) == 1:
-            return items[0]
+        for x in range(1, len(items)):
+            if items[x]['result'] != items[x-1]['result']:
+                return None
+        return items[0]
 
 '''It looks for a word or phrase into the list of timezones and returns the correspoding timezone
 
@@ -1000,7 +1102,7 @@ def get_time(word):
     second = None
 
     # find colon or am/pm in the word
-    if ':' in word or any(x in word for x in AM_PM):
+    if ':' in word or any(word.endswith(x) for x in AM_PM):
         time = word.split(":")
         am_pm = None
         for i, char in enumerate(word):
@@ -1035,7 +1137,7 @@ def suggest(text, language='en', base_date=None, locale_timezone=None, locale="e
     
     first_result = parse(text, language=language, base_date=base_date, locale_timezone=locale_timezone, locale=locale)
     if first_result is not None:
-        print("a match ", first_result)
+        # print("a match ", first_result)
         return first_result
     
     glossary = GLOSSARY[language]
